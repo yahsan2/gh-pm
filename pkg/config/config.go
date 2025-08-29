@@ -16,7 +16,7 @@ type Config struct {
 	Repositories []string           `yaml:"repositories"`
 	Defaults     DefaultsConfig     `yaml:"defaults"`
 	Fields       map[string]Field   `yaml:"fields"`
-	Output       OutputConfig       `yaml:"output"`
+	Metadata     *ConfigMetadata    `yaml:"metadata,omitempty"`
 }
 
 // ProjectConfig represents project settings
@@ -39,11 +39,28 @@ type Field struct {
 	Values map[string]string `yaml:"values"`
 }
 
-// OutputConfig represents output preferences
-type OutputConfig struct {
-	Format   string `yaml:"format"`
-	Color    bool   `yaml:"color"`
-	Timezone string `yaml:"timezone"`
+
+// ConfigMetadata represents cached project metadata
+type ConfigMetadata struct {
+	Project ProjectMetadata `yaml:"project"`
+	Fields  FieldsMetadata  `yaml:"fields"`
+}
+
+// ProjectMetadata represents cached project IDs
+type ProjectMetadata struct {
+	ID string `yaml:"id"` // Node ID (e.g., "PVT_kwHOAAlRwM4A8arc")
+}
+
+// FieldsMetadata represents cached field metadata
+type FieldsMetadata struct {
+	Status   *FieldMetadata `yaml:"status,omitempty"`
+	Priority *FieldMetadata `yaml:"priority,omitempty"`
+}
+
+// FieldMetadata represents cached field IDs and options
+type FieldMetadata struct {
+	ID      string            `yaml:"id"`      // Field ID
+	Options map[string]string `yaml:"options"` // name -> option ID
 }
 
 // DefaultConfig returns a default configuration
@@ -77,11 +94,6 @@ func DefaultConfig() *Config {
 					"done":        "Done",
 				},
 			},
-		},
-		Output: OutputConfig{
-			Format:   "table",
-			Color:    true,
-			Timezone: "UTC",
 		},
 	}
 }
@@ -146,4 +158,18 @@ func findConfigFile() string {
 // Exists checks if configuration file exists
 func Exists() bool {
 	return findConfigFile() != ""
+}
+
+// SaveWithMetadata saves configuration with metadata to file
+func (c *Config) SaveWithMetadata(path string) error {
+	// Use the same implementation as Save since metadata is already part of Config
+	return c.Save(path)
+}
+
+// LoadMetadata loads just the metadata section from configuration
+func (c *Config) LoadMetadata() (*ConfigMetadata, error) {
+	if c.Metadata == nil {
+		return nil, fmt.Errorf("no metadata found in configuration")
+	}
+	return c.Metadata, nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/cli/go-gh/v2/pkg/repository"
 	"github.com/spf13/cobra"
 	"github.com/yahsan2/gh-pm/pkg/config"
+	initpkg "github.com/yahsan2/gh-pm/pkg/init"
 	"github.com/yahsan2/gh-pm/pkg/project"
 )
 
@@ -39,6 +40,7 @@ var (
 	initRepos        []string
 	initInteractive  bool
 	initListProjects bool
+	skipMetadata     bool
 )
 
 func init() {
@@ -49,6 +51,7 @@ func init() {
 	initCmd.Flags().StringSliceVar(&initRepos, "repo", []string{}, "Repositories (owner/repo format)")
 	initCmd.Flags().BoolVarP(&initInteractive, "interactive", "i", true, "Interactive mode")
 	initCmd.Flags().BoolVarP(&initListProjects, "list", "l", false, "List all available projects to choose from")
+	initCmd.Flags().BoolVar(&skipMetadata, "skip-metadata", false, "Skip fetching project metadata (IDs for fields and options)")
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
@@ -220,6 +223,17 @@ func runInit(cmd *cobra.Command, args []string) error {
 					fmt.Println("\nAvailable project fields:")
 					for _, field := range fields {
 						fmt.Printf("  - %s (%s)\n", field.Name, field.DataType)
+					}
+					
+					// Build metadata if not skipping
+					if !skipMetadata {
+						metadataManager := initpkg.NewMetadataManager(client)
+						metadata, err := metadataManager.BuildMetadata(proj, fields)
+						if err != nil {
+							fmt.Printf("Warning: Could not build metadata: %v\n", err)
+						} else {
+							cfg.Metadata = metadata
+						}
 					}
 				}
 			}
@@ -395,6 +409,18 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 		return
 	}
 	
+	// Build metadata if not skipping
+	if !skipMetadata {
+		metadataManager := initpkg.NewMetadataManager(client)
+		metadata, err := metadataManager.BuildMetadata(proj, fields)
+		if err != nil {
+			fmt.Printf("Warning: Could not build metadata: %v\n", err)
+		} else {
+			cfg.Metadata = metadata
+			fmt.Println("✓ Project metadata captured for faster operations")
+		}
+	}
+	
 	// Look for Status field
 	var statusField *project.Field
 	for _, field := range fields {
@@ -410,34 +436,36 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 			fmt.Printf("  %d. %s\n", i+1, opt.Name)
 		}
 		
+		// Always update status field mappings based on actual project options
+		statusMapping := config.Field{
+			Field:  "Status",
+			Values: make(map[string]string),
+		}
+		
+		// Map common status names automatically
+		for _, opt := range statusField.Options {
+			lowerOpt := strings.ToLower(opt.Name)
+			switch {
+			case strings.Contains(lowerOpt, "todo") || strings.Contains(lowerOpt, "backlog"):
+				statusMapping.Values["todo"] = opt.Name
+			case strings.Contains(lowerOpt, "ready"):
+				statusMapping.Values["ready"] = opt.Name
+			case strings.Contains(lowerOpt, "progress") || strings.Contains(lowerOpt, "doing"):
+				statusMapping.Values["in_progress"] = opt.Name
+			case strings.Contains(lowerOpt, "review"):
+				statusMapping.Values["in_review"] = opt.Name
+			case strings.Contains(lowerOpt, "done") || strings.Contains(lowerOpt, "complete"):
+				statusMapping.Values["done"] = opt.Name
+			}
+		}
+		
 		fmt.Print("\nWould you like to configure status field mappings? (y/N): ")
 		scanner := bufio.NewScanner(os.Stdin)
 		if scanner.Scan() {
 			response := strings.ToLower(strings.TrimSpace(scanner.Text()))
 			if response == "y" || response == "yes" {
-				// Update status field mappings
-				statusMapping := config.Field{
-					Field:  "Status",
-					Values: make(map[string]string),
-				}
-				
-				// Map common status names
-				for _, opt := range statusField.Options {
-					lowerOpt := strings.ToLower(opt.Name)
-					switch {
-					case strings.Contains(lowerOpt, "todo") || strings.Contains(lowerOpt, "backlog"):
-						statusMapping.Values["todo"] = opt.Name
-					case strings.Contains(lowerOpt, "progress") || strings.Contains(lowerOpt, "doing"):
-						statusMapping.Values["in_progress"] = opt.Name
-					case strings.Contains(lowerOpt, "review"):
-						statusMapping.Values["in_review"] = opt.Name
-					case strings.Contains(lowerOpt, "done") || strings.Contains(lowerOpt, "complete"):
-						statusMapping.Values["done"] = opt.Name
-					}
-				}
-				
 				// Allow manual override
-				fmt.Println("\nConfigured status mappings:")
+				fmt.Println("\nCurrent status mappings:")
 				for key, val := range statusMapping.Values {
 					fmt.Printf("  %s -> %s\n", key, val)
 				}
@@ -447,7 +475,7 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 					response := strings.ToLower(strings.TrimSpace(scanner.Text()))
 					if response == "y" || response == "yes" {
 						for _, opt := range statusField.Options {
-							fmt.Printf("\nMap '%s' to (todo/in_progress/in_review/done/skip): ", opt.Name)
+							fmt.Printf("\nMap '%s' to (todo/ready/in_progress/in_review/done/skip): ", opt.Name)
 							if scanner.Scan() {
 								mapping := strings.TrimSpace(scanner.Text())
 								if mapping != "" && mapping != "skip" {
@@ -458,10 +486,12 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 					}
 				}
 				
-				cfg.Fields["status"] = statusMapping
 				fmt.Println("✓ Status field mappings configured")
 			}
 		}
+		
+		// Always update the config with the actual field mappings
+		cfg.Fields["status"] = statusMapping
 	}
 	
 	// Look for Priority field
@@ -479,34 +509,34 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 			fmt.Printf("  %d. %s\n", i+1, opt.Name)
 		}
 		
+		// Always update priority field mappings based on actual project options
+		priorityMapping := config.Field{
+			Field:  "Priority",
+			Values: make(map[string]string),
+		}
+		
+		// Map common priority names automatically
+		for _, opt := range priorityField.Options {
+			lowerOpt := strings.ToLower(opt.Name)
+			switch {
+			case strings.Contains(lowerOpt, "p0") || strings.Contains(lowerOpt, "critical") || strings.Contains(lowerOpt, "urgent"):
+				priorityMapping.Values["critical"] = opt.Name
+			case strings.Contains(lowerOpt, "p1") || strings.Contains(lowerOpt, "high"):
+				priorityMapping.Values["high"] = opt.Name
+			case strings.Contains(lowerOpt, "p2") || strings.Contains(lowerOpt, "medium") || strings.Contains(lowerOpt, "normal"):
+				priorityMapping.Values["medium"] = opt.Name
+			case strings.Contains(lowerOpt, "p3") || strings.Contains(lowerOpt, "low"):
+				priorityMapping.Values["low"] = opt.Name
+			}
+		}
+		
 		fmt.Print("\nWould you like to configure priority field mappings? (y/N): ")
 		scanner := bufio.NewScanner(os.Stdin)
 		if scanner.Scan() {
 			response := strings.ToLower(strings.TrimSpace(scanner.Text()))
 			if response == "y" || response == "yes" {
-				// Update priority field mappings
-				priorityMapping := config.Field{
-					Field:  "Priority",
-					Values: make(map[string]string),
-				}
-				
-				// Map common priority names
-				for _, opt := range priorityField.Options {
-					lowerOpt := strings.ToLower(opt.Name)
-					switch {
-					case strings.Contains(lowerOpt, "low"):
-						priorityMapping.Values["low"] = opt.Name
-					case strings.Contains(lowerOpt, "medium") || strings.Contains(lowerOpt, "normal"):
-						priorityMapping.Values["medium"] = opt.Name
-					case strings.Contains(lowerOpt, "high"):
-						priorityMapping.Values["high"] = opt.Name
-					case strings.Contains(lowerOpt, "critical") || strings.Contains(lowerOpt, "urgent"):
-						priorityMapping.Values["critical"] = opt.Name
-					}
-				}
-				
 				// Allow manual override
-				fmt.Println("\nConfigured priority mappings:")
+				fmt.Println("\nCurrent priority mappings:")
 				for key, val := range priorityMapping.Values {
 					fmt.Printf("  %s -> %s\n", key, val)
 				}
@@ -527,10 +557,12 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 					}
 				}
 				
-				cfg.Fields["priority"] = priorityMapping
 				fmt.Println("✓ Priority field mappings configured")
 			}
 		}
+		
+		// Always update the config with the actual field mappings
+		cfg.Fields["priority"] = priorityMapping
 	}
 }
 

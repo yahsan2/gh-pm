@@ -70,7 +70,12 @@ func (c *Client) GetProject(org string, projectName string, projectNumber int) (
 					url
 					owner {
 						__typename
-						login
+						... on Organization {
+							login
+						}
+						... on User {
+							login
+						}
 					}
 				}
 			}
@@ -124,7 +129,12 @@ func (c *Client) ListProjects(org string) ([]Project, error) {
 						url
 						owner {
 							__typename
-							login
+							... on Organization {
+								login
+							}
+							... on User {
+								login
+							}
 						}
 					}
 					pageInfo {
@@ -242,7 +252,12 @@ func (c *Client) GetRepoProjects(owner, repo string) ([]Project, error) {
 						url
 						owner {
 							__typename
-							login
+							... on Organization {
+								login
+							}
+							... on User {
+								login
+							}
 						}
 					}
 					pageInfo {
@@ -289,6 +304,21 @@ func (c *Client) GetRepoProjects(owner, repo string) ([]Project, error) {
 	}
 
 	return allProjects, nil
+}
+
+// GetProjectNodeID returns the node ID for a project
+func (c *Client) GetProjectNodeID(org string, projectNumber int) (string, error) {
+	proj, err := c.GetProject(org, "", projectNumber)
+	if err != nil {
+		return "", err
+	}
+	return proj.ID, nil
+}
+
+// GetFieldsWithOptions fetches fields with their options including IDs
+func (c *Client) GetFieldsWithOptions(projectID string) ([]Field, error) {
+	// This is the same as GetProjectFields but with a more explicit name
+	return c.GetProjectFields(projectID)
 }
 
 // graphQL executes a GraphQL query
