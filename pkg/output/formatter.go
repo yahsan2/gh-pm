@@ -251,3 +251,84 @@ func (f *Formatter) FormatError(err error) error {
 	_, printErr := fmt.Fprintln(f.writer, err.Error())
 	return printErr
 }
+
+// FormatIssueView formats an issue with detailed information for view command
+func (f *Formatter) FormatIssueView(issue *issue.Issue) error {
+	switch f.format {
+	case FormatQuiet:
+		// Output the project URL if available, otherwise the issue URL
+		urlToShow := issue.URL
+		if issue.ProjectURL != "" {
+			urlToShow = issue.ProjectURL
+		}
+		_, err := fmt.Fprintln(f.writer, urlToShow)
+		return err
+	case FormatJSON:
+		return f.formatIssueJSON(issue)
+	case FormatCSV:
+		return f.formatIssueCSV(issue)
+	default:
+		return f.formatIssueViewTable(issue)
+	}
+}
+
+// formatIssueViewTable formats detailed issue view as a table
+func (f *Formatter) formatIssueViewTable(issue *issue.Issue) error {
+	w := tabwriter.NewWriter(f.writer, 0, 0, 2, ' ', 0)
+	defer w.Flush()
+	
+	// Basic information
+	fmt.Fprintf(w, "Number:\t#%d\n", issue.Number)
+	fmt.Fprintf(w, "Title:\t%s\n", issue.Title)
+	fmt.Fprintf(w, "State:\t%s\n", issue.State)
+	fmt.Fprintf(w, "Repository:\t%s\n", issue.Repository)
+	fmt.Fprintf(w, "URL:\t%s\n", issue.URL)
+	
+	if issue.ProjectURL != "" {
+		fmt.Fprintf(w, "Project URL:\t%s\n", issue.ProjectURL)
+	}
+	
+	// Body (if present)
+	if issue.Body != "" {
+		fmt.Fprintf(w, "\nDescription:\n")
+		lines := strings.Split(issue.Body, "\n")
+		for _, line := range lines {
+			fmt.Fprintf(w, "  %s\n", line)
+		}
+	}
+	
+	// Labels
+	if len(issue.Labels) > 0 {
+		labels := make([]string, len(issue.Labels))
+		for i, label := range issue.Labels {
+			labels[i] = label.Name
+		}
+		fmt.Fprintf(w, "\nLabels:\t%s\n", strings.Join(labels, ", "))
+	}
+	
+	// Project fields
+	if issue.ProjectItem != nil && len(issue.ProjectItem.Fields) > 0 {
+		fmt.Fprintf(w, "\nProject Fields:\n")
+		for key, value := range issue.ProjectItem.Fields {
+			fmt.Fprintf(w, "  %s:\t%v\n", key, value)
+		}
+	}
+	
+	// Comments
+	if len(issue.Comments) > 0 {
+		fmt.Fprintf(w, "\nComments (%d):\n", len(issue.Comments))
+		for i, comment := range issue.Comments {
+			fmt.Fprintf(w, "\n  Comment #%d by %s at %s:\n", i+1, comment.Author, comment.CreatedAt.Format("2006-01-02 15:04"))
+			commentLines := strings.Split(comment.Body, "\n")
+			for _, line := range commentLines {
+				fmt.Fprintf(w, "    %s\n", line)
+			}
+		}
+	}
+	
+	// Timestamps
+	fmt.Fprintf(w, "\nCreated:\t%s\n", issue.CreatedAt.Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(w, "Updated:\t%s\n", issue.UpdatedAt.Format("2006-01-02 15:04:05"))
+	
+	return nil
+}

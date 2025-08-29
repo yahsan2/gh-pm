@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strconv"
+	"time"
 	
 	"github.com/cli/go-gh/v2/pkg/api"
 )
@@ -152,7 +153,7 @@ func (c *Client) UpdateProjectItemField(projectID, itemID, fieldID, optionID str
 
 // GetIssueDetails fetches issue details using gh issue view command
 func GetIssueDetails(number int, repo string) (*Issue, error) {
-	args := []string{"issue", "view", strconv.Itoa(number), "--json", "id,number,title,url,state"}
+	args := []string{"issue", "view", strconv.Itoa(number), "--json", "id,number,title,body,url,state,createdAt,updatedAt,labels"}
 	
 	if repo != "" {
 		args = append(args, "--repo", repo)
@@ -168,23 +169,43 @@ func GetIssueDetails(number int, repo string) (*Issue, error) {
 	}
 	
 	var result struct {
-		ID     string `json:"id"`
-		Number int    `json:"number"`
-		Title  string `json:"title"`
-		URL    string `json:"url"`
-		State  string `json:"state"`
+		ID        string    `json:"id"`
+		Number    int       `json:"number"`
+		Title     string    `json:"title"`
+		Body      string    `json:"body"`
+		URL       string    `json:"url"`
+		State     string    `json:"state"`
+		CreatedAt time.Time `json:"createdAt"`
+		UpdatedAt time.Time `json:"updatedAt"`
+		Labels    []struct {
+			Name  string `json:"name"`
+			Color string `json:"color"`
+		} `json:"labels"`
 	}
 	
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		return nil, fmt.Errorf("failed to parse gh output: %w", err)
 	}
 	
+	// Convert labels
+	labels := make([]Label, len(result.Labels))
+	for i, l := range result.Labels {
+		labels[i] = Label{
+			Name:  l.Name,
+			Color: l.Color,
+		}
+	}
+	
 	return &Issue{
 		ID:         result.ID,
 		Number:     result.Number,
 		Title:      result.Title,
+		Body:       result.Body,
 		URL:        result.URL,
 		State:      result.State,
 		Repository: repo,
+		Labels:     labels,
+		CreatedAt:  result.CreatedAt,
+		UpdatedAt:  result.UpdatedAt,
 	}, nil
 }

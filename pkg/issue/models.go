@@ -26,12 +26,14 @@ type Issue struct {
 	ID          string       `json:"id"`
 	Number      int          `json:"number"`
 	Title       string       `json:"title"`
+	Body        string       `json:"body,omitempty"`
 	URL         string       `json:"url"`
 	State       string       `json:"state"`
 	Repository  string       `json:"repository"`
 	Labels      []Label      `json:"labels"`
 	ProjectItem *ProjectItem `json:"project_item,omitempty"`
 	ProjectURL  string       `json:"project_url,omitempty"`
+	Comments    []Comment    `json:"comments,omitempty"`
 	CreatedAt   time.Time    `json:"created_at"`
 	UpdatedAt   time.Time    `json:"updated_at"`
 }
@@ -44,9 +46,18 @@ type Label struct {
 
 // ProjectItem represents an issue's connection to a project
 type ProjectItem struct {
-	ID        string                 `json:"id"`
-	ProjectID string                 `json:"project_id"`
-	Fields    map[string]interface{} `json:"fields"`
+	ID         string                 `json:"id"`
+	DatabaseID int                    `json:"database_id"`
+	ProjectID  string                 `json:"project_id"`
+	Fields     map[string]interface{} `json:"fields"`
+}
+
+// Comment represents a comment on an issue
+type Comment struct {
+	ID        string    `json:"id"`
+	Author    string    `json:"author"`
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // Validate checks if the issue data is valid

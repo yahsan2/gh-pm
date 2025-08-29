@@ -321,6 +321,127 @@ func (c *Client) GetFieldsWithOptions(projectID string) ([]Field, error) {
 	return c.GetProjectFields(projectID)
 }
 
+// ProjectItemData represents a project item with its data
+type ProjectItemData struct {
+	ID          string                 `json:"id"`
+	DatabaseID  int                    `json:"databaseId"`
+	FieldValues map[string]interface{} `json:"fieldValues"`
+}
+
+// GetProjectItemForIssue retrieves the project item for a specific issue
+func (c *Client) GetProjectItemForIssue(projectID, issueID string) (*ProjectItemData, error) {
+	query := `
+		query($issueId: ID!) {
+			node(id: $issueId) {
+				... on Issue {
+					projectItems(first: 10) {
+						nodes {
+							id
+							databaseId
+							project {
+								id
+							}
+							fieldValues(first: 20) {
+								nodes {
+									... on ProjectV2ItemFieldSingleSelectValue {
+										field {
+											... on ProjectV2Field {
+												id
+											}
+										}
+										optionId
+									}
+									... on ProjectV2ItemFieldTextValue {
+										field {
+											... on ProjectV2Field {
+												id
+											}
+										}
+										text
+									}
+									... on ProjectV2ItemFieldNumberValue {
+										field {
+											... on ProjectV2Field {
+												id
+											}
+										}
+										number
+									}
+									... on ProjectV2ItemFieldDateValue {
+										field {
+											... on ProjectV2Field {
+												id
+											}
+										}
+										date
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}`
+
+	variables := map[string]interface{}{
+		"issueId": issueID,
+	}
+
+	var result struct {
+		Node struct {
+			ProjectItems struct {
+				Nodes []struct {
+					ID         string `json:"id"`
+					DatabaseID int    `json:"databaseId"`
+					Project    struct {
+						ID string `json:"id"`
+					} `json:"project"`
+					FieldValues struct {
+						Nodes []map[string]interface{} `json:"nodes"`
+					} `json:"fieldValues"`
+				} `json:"nodes"`
+			} `json:"projectItems"`
+		} `json:"node"`
+	}
+
+	err := c.gql.Do(query, variables, &result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project item: %w", err)
+	}
+
+	// Find the item for the specified project
+	for _, item := range result.Node.ProjectItems.Nodes {
+		if item.Project.ID == projectID {
+			// Parse field values
+			fieldValues := make(map[string]interface{})
+			for _, fv := range item.FieldValues.Nodes {
+				if field, ok := fv["field"].(map[string]interface{}); ok {
+					if fieldID, ok := field["id"].(string); ok {
+						// Get the value based on the field type
+						if optionID, ok := fv["optionId"].(string); ok {
+							fieldValues[fieldID] = optionID
+						} else if text, ok := fv["text"].(string); ok {
+							fieldValues[fieldID] = text
+						} else if number, ok := fv["number"].(float64); ok {
+							fieldValues[fieldID] = number
+						} else if date, ok := fv["date"].(string); ok {
+							fieldValues[fieldID] = date
+						}
+					}
+				}
+			}
+
+			return &ProjectItemData{
+				ID:          item.ID,
+				DatabaseID:  item.DatabaseID,
+				FieldValues: fieldValues,
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("project item not found for issue %s in project %s", issueID, projectID)
+}
+
 // graphQL executes a GraphQL query
 func (c *Client) graphQL(query string, variables map[string]interface{}, result interface{}) error {
 	return c.gql.Do(query, variables, result)
