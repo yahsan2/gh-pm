@@ -66,8 +66,8 @@ gh pm list
 # Create a new issue with priority
 gh pm create --title "Implement authentication" --priority high --label "backend"
 
-# Update issue status
-gh pm update 123 --status "In Progress"
+# Move issue to In Progress status
+gh pm move 123 --status in_progress
 
 # Add sub-task to an issue
 gh pm add-task 123 --title "Design database schema"
@@ -164,17 +164,39 @@ gh pm create \
   --milestone "v1.0"
 ```
 
-#### Update Issue
+#### Move Issue (Update Project Fields)
 ```bash
 # Update single field
-gh pm update 123 --status "In Review"
+gh pm move 123 --status in_review
 
 # Update multiple fields
-gh pm update 123 \
-  --priority critical \
-  --assignee "johndoe" \
-  --add-label "urgent"
+gh pm move 123 --status in_progress --priority p0
+
+# Available status values (based on your project configuration)
+gh pm move 15 --status ready
+gh pm move 42 --status done
+
+# Available priority values (based on your project configuration)
+gh pm move 123 --priority p1  # High priority
+gh pm move 456 --priority p2  # Medium priority
+
+# Quiet mode (minimal output)
+gh pm move 123 --status done --quiet
+
+# Specify repository explicitly
+gh pm move 123 --status ready --repo owner/repo
 ```
+
+**Available Field Values:**
+The exact field values depend on your project configuration (`.gh-pm.yml`):
+
+- **Status**: `backlog`, `ready`, `in_progress`, `in_review`, `done`
+- **Priority**: `p0` (Critical), `p1` (High), `p2` (Medium), etc.
+
+**Important Notes:**
+- The issue must already be added to the configured project
+- Field values are case-sensitive and must match your project configuration
+- Use `gh pm init` to see available values for your project
 
 ### Task Decomposition
 
@@ -215,11 +237,14 @@ gh pm complete-tasks 123 --ids 456,457,458
 
 #### Set Priority
 ```bash
-# Set single issue priority
-gh pm set-priority 123 high
+# Set single issue priority using move command
+gh pm move 123 --priority p0  # Critical priority
 
-# Bulk priority update
-gh pm set-priority 123,124,125 --level critical
+# Set priority with status update
+gh pm move 123 --status in_progress --priority p1
+
+# Note: Bulk priority updates coming in future releases
+# gh pm set-priority 123,124,125 --level critical  # Coming soon
 ```
 
 #### Priority Matrix
@@ -513,6 +538,20 @@ npm run build
 
 ## Roadmap
 
+### ✅ Completed Features
+- [x] **Issue creation** with project metadata (`gh pm create`)
+- [x] **Project initialization** with auto-detection (`gh pm init`)
+- [x] **Issue status & priority updates** (`gh pm move`)
+- [x] **Configuration management** with field mapping
+- [x] **Multiple output formats** (table, JSON, CSV)
+
+### 🚧 In Development / Planned
+- [ ] Issue listing and filtering (`gh pm list`)
+- [ ] Bulk operations and CSV import/export
+- [ ] Task decomposition (`gh pm add-task`)
+- [ ] Progress tracking and reporting (`gh pm status`)
+
+### 🔮 Future Features
 - [ ] Sprint management (`gh pm sprint ...`)
 - [ ] Gantt chart visualization
 - [ ] Time tracking integration
