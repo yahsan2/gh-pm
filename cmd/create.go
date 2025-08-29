@@ -12,7 +12,7 @@ import (
 )
 
 var createCmd = &cobra.Command{
-	Use:   "create [title]",
+	Use:   "create",
 	Short: "Create a new issue with project metadata",
 	Long: `Create a new GitHub issue and automatically add it to the configured project
 with metadata such as priority and status.
@@ -23,13 +23,13 @@ This command will:
 - Set priority, status, and other custom fields
 - Apply default labels from configuration`,
 	Example: `  # Create an issue with a title
-  gh pm create "Fix login bug"
+  gh pm create --title "Fix login bug"
   
   # Create an issue with title and body
-  gh pm create "Add new feature" --body "Description of the feature"
+  gh pm create --title "Add new feature" --body "Description of the feature"
   
   # Create with specific priority and status
-  gh pm create "Critical issue" --priority high --status in_progress
+  gh pm create --title "Critical issue" --priority high --status in_progress
   
   # Create from a file (batch mode)
   gh pm create --from-file issues.yml
@@ -65,6 +65,7 @@ func init() {
 	rootCmd.AddCommand(createCmd)
 	
 	// Basic issue flags
+	createCmd.Flags().StringVarP(&createTitle, "title", "t", "", "Issue title")
 	createCmd.Flags().StringVarP(&createBody, "body", "b", "", "Issue body content")
 	createCmd.Flags().StringSliceVarP(&createLabels, "labels", "l", []string{}, "Comma-separated labels")
 	
@@ -97,14 +98,14 @@ type CreateCommand struct {
 }
 
 func runCreate(cmd *cobra.Command, args []string) error {
-	// Extract title from args if provided
-	if len(args) > 0 {
+	// For backward compatibility, if args are provided without --title flag, use them as title
+	if len(args) > 0 && createTitle == "" {
 		createTitle = strings.Join(args, " ")
 	}
 	
 	// Validate basic requirements
 	if createTitle == "" && createFromFile == "" && createTemplate == "" && !createInteractive {
-		return fmt.Errorf("issue title is required (use --from-file, --template, or --interactive for alternatives)")
+		return fmt.Errorf("issue title is required (use --title, --from-file, --template, or --interactive)")
 	}
 	
 	// Load configuration
