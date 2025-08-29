@@ -73,7 +73,7 @@ func DefaultConfig() *Config {
 		Repositories: []string{},
 		Defaults: DefaultsConfig{
 			Priority: "medium",
-			Status:   "Todo",
+			Status:   "todo",
 			Labels:   []string{"pm-tracked"},
 		},
 		Fields: map[string]Field{

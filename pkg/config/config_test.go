@@ -15,7 +15,7 @@ func TestDefaultConfig(t *testing.T) {
 	
 	assert.NotNil(t, cfg)
 	assert.Equal(t, "medium", cfg.Defaults.Priority)
-	assert.Equal(t, "Todo", cfg.Defaults.Status)
+	assert.Equal(t, "todo", cfg.Defaults.Status)
 	assert.Contains(t, cfg.Defaults.Labels, "pm-tracked")
 	
 	// Check field mappings

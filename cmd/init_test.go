@@ -52,6 +52,6 @@ func TestInitCommand(t *testing.T) {
 		assert.Equal(t, "test-org", loadedCfg.Project.Org)
 		assert.Equal(t, []string{"test-org/test-repo"}, loadedCfg.Repositories)
 		assert.Equal(t, "medium", loadedCfg.Defaults.Priority)
-		assert.Equal(t, "Todo", loadedCfg.Defaults.Status)
+		assert.Equal(t, "todo", loadedCfg.Defaults.Status)
 	})
 }
