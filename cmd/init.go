@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/cli/go-gh/v2/pkg/repository"
@@ -63,49 +66,97 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Create default config
 	cfg := config.DefaultConfig()
 
-	// If interactive mode, prompt for values
+	// Try to detect from current repository first
+	org, repo, repoErr := getCurrentRepo()
+	if repoErr == nil {
+		// Set org if not specified
+		if initOrg == "" {
+			cfg.Project.Org = org
+		} else {
+			cfg.Project.Org = initOrg
+		}
+		
+		// Add current repo to repositories if not already included
+		currentRepo := fmt.Sprintf("%s/%s", org, repo)
+		if !contains(initRepos, currentRepo) {
+			cfg.Repositories = append([]string{currentRepo}, initRepos...)
+		} else {
+			cfg.Repositories = initRepos
+		}
+
+		// Try to auto-detect projects from current repository
+		if initProject == "" && initInteractive {
+			fmt.Printf("Detecting projects for repository %s/%s...\n", org, repo)
+			
+			client, err := project.NewClient()
+			if err == nil {
+				repoProjects, err := client.GetRepoProjects(org, repo)
+				if err == nil && len(repoProjects) > 0 {
+					selectedProject := selectProject(repoProjects, org)
+					if selectedProject != nil {
+						cfg.Project.Name = selectedProject.Title
+						cfg.Project.Number = selectedProject.Number
+						initProject = selectedProject.Title
+						fmt.Printf("✓ Selected project: %s (#%d)\n", selectedProject.Title, selectedProject.Number)
+					}
+				} else if err == nil && len(repoProjects) == 0 {
+					// No projects in repo, try to list org projects
+					fmt.Printf("No projects found in repository. Checking organization projects...\n")
+					orgProjects, err := client.ListProjects(cfg.Project.Org)
+					if err == nil && len(orgProjects) > 0 {
+						selectedProject := selectProject(orgProjects, cfg.Project.Org)
+						if selectedProject != nil {
+							cfg.Project.Name = selectedProject.Title
+							cfg.Project.Number = selectedProject.Number
+							initProject = selectedProject.Title
+							fmt.Printf("✓ Selected project: %s (#%d)\n", selectedProject.Title, selectedProject.Number)
+						}
+					}
+				}
+			}
+		}
+	} else {
+		// No repo detected, use provided values
+		cfg.Project.Org = initOrg
+		cfg.Repositories = initRepos
+	}
+
+	// If interactive mode and project still not set, prompt for it
 	if initInteractive && initProject == "" {
 		fmt.Print("Enter project name (leave empty to skip): ")
-		fmt.Scanln(&initProject)
+		scanner := bufio.NewScanner(os.Stdin)
+		if scanner.Scan() {
+			initProject = strings.TrimSpace(scanner.Text())
+		}
 	}
 
-	if initInteractive && initOrg == "" {
-		fmt.Print("Enter organization name (leave empty for current repo's org): ")
-		fmt.Scanln(&initOrg)
+	// If interactive mode and org still not set, prompt for it
+	if initInteractive && cfg.Project.Org == "" {
+		fmt.Print("Enter organization name: ")
+		scanner := bufio.NewScanner(os.Stdin)
+		if scanner.Scan() {
+			cfg.Project.Org = strings.TrimSpace(scanner.Text())
+		}
 	}
 
-	if initInteractive && len(initRepos) == 0 {
+	// If interactive mode and no repos, prompt for them
+	if initInteractive && len(cfg.Repositories) == 0 {
 		fmt.Print("Enter repositories (comma-separated, e.g., owner/repo1,owner/repo2): ")
-		var repoInput string
-		fmt.Scanln(&repoInput)
-		if repoInput != "" {
-			initRepos = strings.Split(repoInput, ",")
+		scanner := bufio.NewScanner(os.Stdin)
+		if scanner.Scan() {
+			repoInput := strings.TrimSpace(scanner.Text())
+			if repoInput != "" {
+				repos := strings.Split(repoInput, ",")
+				for _, r := range repos {
+					cfg.Repositories = append(cfg.Repositories, strings.TrimSpace(r))
+				}
+			}
 		}
 	}
 
-	// Set values from flags or interactive input
-	cfg.Project.Name = initProject
-	cfg.Project.Org = initOrg
-	
-	// Clean up repository names
-	for i, repo := range initRepos {
-		initRepos[i] = strings.TrimSpace(repo)
-	}
-	cfg.Repositories = initRepos
-
-	// If org is not specified, try to detect from current repository
-	if cfg.Project.Org == "" {
-		org, repo, err := getCurrentRepo()
-		if err == nil {
-			if cfg.Project.Org == "" {
-				cfg.Project.Org = org
-			}
-			// Add current repo to repositories if not already included
-			currentRepo := fmt.Sprintf("%s/%s", org, repo)
-			if !contains(cfg.Repositories, currentRepo) {
-				cfg.Repositories = append([]string{currentRepo}, cfg.Repositories...)
-			}
-		}
+	// Set the project name if it was provided or selected
+	if initProject != "" {
+		cfg.Project.Name = initProject
 	}
 
 	// If project is specified, try to fetch project details
@@ -169,4 +220,48 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// selectProject presents a list of projects and allows the user to select one
+func selectProject(projects []project.Project, orgName string) *project.Project {
+	if len(projects) == 0 {
+		return nil
+	}
+
+	// If only one project, auto-select it
+	if len(projects) == 1 {
+		fmt.Printf("Found 1 project: %s (#%d)\n", projects[0].Title, projects[0].Number)
+		fmt.Print("Use this project? (Y/n): ")
+		scanner := bufio.NewScanner(os.Stdin)
+		if scanner.Scan() {
+			response := strings.ToLower(strings.TrimSpace(scanner.Text()))
+			if response == "" || response == "y" || response == "yes" {
+				return &projects[0]
+			}
+		}
+		return nil
+	}
+
+	// Multiple projects, show selection menu
+	fmt.Printf("\nFound %d projects:\n", len(projects))
+	for i, p := range projects {
+		fmt.Printf("  %d. %s (#%d)\n", i+1, p.Title, p.Number)
+	}
+	fmt.Printf("  0. Skip project selection\n")
+	fmt.Printf("\nSelect a project (0-%d): ", len(projects))
+
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		input := strings.TrimSpace(scanner.Text())
+		choice, err := strconv.Atoi(input)
+		if err == nil && choice >= 0 && choice <= len(projects) {
+			if choice == 0 {
+				return nil
+			}
+			return &projects[choice-1]
+		}
+	}
+
+	fmt.Println("Invalid selection, skipping project selection.")
+	return nil
 }

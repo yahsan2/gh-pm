@@ -229,6 +229,68 @@ func (c *Client) GetProjectFields(projectID string) ([]Field, error) {
 	return fields, nil
 }
 
+// GetRepoProjects fetches all projects associated with a repository
+func (c *Client) GetRepoProjects(owner, repo string) ([]Project, error) {
+	query := `
+		query($owner: String!, $repo: String!, $cursor: String) {
+			repository(owner: $owner, name: $repo) {
+				projectsV2(first: 100, after: $cursor) {
+					nodes {
+						id
+						number
+						title
+						url
+						owner {
+							__typename
+							login
+						}
+					}
+					pageInfo {
+						hasNextPage
+						endCursor
+					}
+				}
+			}
+		}`
+
+	var allProjects []Project
+	var cursor *string
+
+	for {
+		variables := map[string]interface{}{
+			"owner":  owner,
+			"repo":   repo,
+			"cursor": cursor,
+		}
+
+		var result struct {
+			Repository struct {
+				ProjectsV2 struct {
+					Nodes    []Project `json:"nodes"`
+					PageInfo struct {
+						HasNextPage bool   `json:"hasNextPage"`
+						EndCursor   string `json:"endCursor"`
+					} `json:"pageInfo"`
+				} `json:"projectsV2"`
+			} `json:"repository"`
+		}
+
+		err := c.graphQL(query, variables, &result)
+		if err != nil {
+			return nil, err
+		}
+
+		allProjects = append(allProjects, result.Repository.ProjectsV2.Nodes...)
+
+		if !result.Repository.ProjectsV2.PageInfo.HasNextPage {
+			break
+		}
+		cursor = &result.Repository.ProjectsV2.PageInfo.EndCursor
+	}
+
+	return allProjects, nil
+}
+
 // graphQL executes a GraphQL query
 func (c *Client) graphQL(query string, variables map[string]interface{}, result interface{}) error {
 	return c.gql.Do(query, variables, result)
