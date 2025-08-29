@@ -151,6 +151,58 @@ func (c *Client) UpdateProjectItemField(projectID, itemID, fieldID, optionID str
 	return nil
 }
 
+// GetProjectItemID gets the project item ID for an issue if it exists in the project
+func (c *Client) GetProjectItemID(issueID, projectID string) (string, int, error) {
+	query := `
+		query($issueId: ID!) {
+			node(id: $issueId) {
+				... on Issue {
+					projectItems(first: 100) {
+						nodes {
+							id
+							databaseId
+							project {
+								id
+							}
+						}
+					}
+				}
+			}
+		}`
+	
+	variables := map[string]interface{}{
+		"issueId": issueID,
+	}
+	
+	var result struct {
+		Node struct {
+			ProjectItems struct {
+				Nodes []struct {
+					ID         string `json:"id"`
+					DatabaseID int    `json:"databaseId"`
+					Project    struct {
+						ID string `json:"id"`
+					} `json:"project"`
+				} `json:"nodes"`
+			} `json:"projectItems"`
+		} `json:"node"`
+	}
+	
+	err := c.gql.Do(query, variables, &result)
+	if err != nil {
+		return "", 0, NewAPIError("failed to get project item", err)
+	}
+	
+	// Find the item for the specified project
+	for _, item := range result.Node.ProjectItems.Nodes {
+		if item.Project.ID == projectID {
+			return item.ID, item.DatabaseID, nil
+		}
+	}
+	
+	return "", 0, nil // Not found in project
+}
+
 // GetIssueDetails fetches issue details using gh issue view command
 func GetIssueDetails(number int, repo string) (*Issue, error) {
 	args := []string{"issue", "view", strconv.Itoa(number), "--json", "id,number,title,body,url,state,createdAt,updatedAt,labels"}

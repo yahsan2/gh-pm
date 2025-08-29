@@ -24,9 +24,10 @@ fields:
             in_progress: In progress
             in_review: In review
             ready: Ready
+
 triage:
     estimate:
-        query: is:issue is:open -has:estimate
+        query: is:issue is:open status:backlog -has:estimate
         apply: {}
         interactive:
             estimate: true

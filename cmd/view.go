@@ -63,6 +63,7 @@ type ViewCommand struct {
 	client     *project.Client
 	issueAPI   *issue.Client
 	formatter  *output.Formatter
+	urlBuilder *project.URLBuilder
 }
 
 func runView(cmd *cobra.Command, args []string) error {
@@ -102,12 +103,16 @@ func runView(cmd *cobra.Command, args []string) error {
 	
 	formatter := output.NewFormatter(formatType)
 	
+	// Create URL builder
+	urlBuilder := project.NewURLBuilder(cfg, projectClient)
+	
 	// Create command executor
 	command := &ViewCommand{
 		config:     cfg,
 		client:     projectClient,
 		issueAPI:   issueClient,
 		formatter:  formatter,
+		urlBuilder: urlBuilder,
 	}
 	
 	return command.Execute(issueNumber)
@@ -141,24 +146,8 @@ func (c *ViewCommand) Execute(issueNumber int) error {
 			issueDetails.ProjectItem = projectData
 			
 			// Build project URL
-			if c.config.Project.Number > 0 && projectData != nil && projectData.DatabaseID > 0 {
-				if c.config.Project.Org != "" {
-					issueDetails.ProjectURL = fmt.Sprintf("https://github.com/orgs/%s/projects/%d/views/1?pane=issue&itemId=%d",
-						c.config.Project.Org, c.config.Project.Number, projectData.DatabaseID)
-				} else {
-					owner := c.config.Project.Owner
-					if owner == "" {
-						// Try to get current user
-						user, err := c.client.GetCurrentUser()
-						if err == nil && user != "" {
-							owner = user
-						}
-					}
-					if owner != "" {
-						issueDetails.ProjectURL = fmt.Sprintf("https://github.com/users/%s/projects/%d/views/1?pane=issue&itemId=%d",
-							owner, c.config.Project.Number, projectData.DatabaseID)
-					}
-				}
+			if projectData != nil && projectData.DatabaseID > 0 {
+				issueDetails.ProjectURL = c.urlBuilder.GetProjectItemURL(projectData.DatabaseID)
 			}
 		}
 	}
@@ -300,21 +289,9 @@ func (c *ViewCommand) openInBrowser(issueNumber int, repo string) error {
 	if c.config.Project.Number > 0 {
 		projectData, err := c.getProjectMetadata(issueDetails)
 		if err == nil && projectData != nil && projectData.DatabaseID > 0 {
-			if c.config.Project.Org != "" {
-				urlToOpen = fmt.Sprintf("https://github.com/orgs/%s/projects/%d/views/1?pane=issue&itemId=%d",
-					c.config.Project.Org, c.config.Project.Number, projectData.DatabaseID)
-			} else {
-				owner := c.config.Project.Owner
-				if owner == "" {
-					user, err := c.client.GetCurrentUser()
-					if err == nil && user != "" {
-						owner = user
-					}
-				}
-				if owner != "" {
-					urlToOpen = fmt.Sprintf("https://github.com/users/%s/projects/%d/views/1?pane=issue&itemId=%d",
-						owner, c.config.Project.Number, projectData.DatabaseID)
-				}
+			projectURL := c.urlBuilder.GetProjectItemURL(projectData.DatabaseID)
+			if projectURL != "" {
+				urlToOpen = projectURL
 			}
 		}
 	}

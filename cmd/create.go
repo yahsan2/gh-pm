@@ -98,6 +98,7 @@ type CreateCommand struct {
 	client     *project.Client
 	issueAPI   *issue.Client
 	formatter  *output.Formatter
+	urlBuilder *project.URLBuilder
 }
 
 func runCreate(cmd *cobra.Command, args []string) error {
@@ -140,12 +141,16 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	
 	formatter := output.NewFormatter(formatType)
 	
+	// Create URL builder
+	urlBuilder := project.NewURLBuilder(cfg, projectClient)
+	
 	// Create command executor
 	command := &CreateCommand{
 		config:     cfg,
 		client:     projectClient,
 		issueAPI:   issueClient,
 		formatter:  formatter,
+		urlBuilder: urlBuilder,
 	}
 	
 	// Execute based on mode
@@ -339,26 +344,7 @@ func (c *CreateCommand) Execute(title string) error {
 		}
 		
 		// Build the project URL with the numeric database ID
-		if c.config.Project.Org != "" {
-			// For organization projects, use /orgs/ path
-			projectURL = fmt.Sprintf("https://github.com/orgs/%s/projects/%d/views/1?pane=issue&itemId=%d",
-				c.config.Project.Org, c.config.Project.Number, databaseID)
-		} else {
-			// For user projects, use /users/ path
-			// First try to use the stored owner from config
-			owner := c.config.Project.Owner
-			if owner == "" {
-				// Fallback to getting current user if owner not in config
-				user, err := c.client.GetCurrentUser()
-				if err == nil && user != "" {
-					owner = user
-				}
-			}
-			if owner != "" {
-				projectURL = fmt.Sprintf("https://github.com/users/%s/projects/%d/views/1?pane=issue&itemId=%d",
-					owner, c.config.Project.Number, databaseID)
-			}
-		}
+		projectURL = c.urlBuilder.GetProjectItemURL(databaseID)
 		
 		// Get project fields to map field names to IDs
 		fields, err := c.client.GetFieldsWithOptions(projectID)
