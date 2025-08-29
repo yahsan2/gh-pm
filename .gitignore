@@ -1,0 +1,39 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+gh-pm
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# IDE files
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Configuration files (for testing)
+.gh-pm.yml.test
+.gh-pm.yml.bak
+
+# Build artifacts
+dist/
+build/
