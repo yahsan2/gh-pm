@@ -16,6 +16,4 @@ jobs:
         uses: actions/checkout@v4
         
       - name: Build and Release
-        uses: cli/gh-extension-precompile@v1
-        with:
-          go_version_file: go.mod
+        uses: cli/gh-extension-precompile@v2
