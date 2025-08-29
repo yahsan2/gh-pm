@@ -5,25 +5,25 @@ project:
 repositories:
     - yahsan2/gh-pm
 defaults:
-    priority: medium
-    status: todo
+    priority: p1
+    status: backlog
     labels:
         - pm-tracked
 fields:
     priority:
         field: Priority
         values:
-            critical: P0
-            high: P1
-            medium: P2
+            p0: P0
+            p1: P1
+            p2: P2
     status:
         field: Status
         values:
+            backlog: Backlog
             done: Done
             in_progress: In progress
             in_review: In review
             ready: Ready
-            todo: Backlog
 metadata:
     project:
         id: PVT_kwHOAAlRwM4BBvYB
