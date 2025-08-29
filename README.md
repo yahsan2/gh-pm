@@ -5,12 +5,13 @@ A GitHub CLI extension for project management with GitHub Projects (v2) and Issu
 ## Features
 
 - 📊 **Project Management** - Manage GitHub Projects v2 directly from CLI
-- 🔄 **Issue Workflow** - Create, update, and track issues with rich metadata
-- 🏗️ **Task Decomposition** - Break down issues into manageable sub-tasks
+- 🔄 **Issue Workflow** - Create, update, view, and track issues with rich metadata
+- 🔍 **Issue Triage** - Bulk process issues with configurable rules and interactive mode
 - 🎯 **Priority Management** - Set and track priorities across issues
+- 🔗 **Project Board Integration** - Direct links to GitHub Projects board views
 - 📈 **Progress Tracking** - Monitor task completion and project status
-- 🔗 **Cross-repository Support** - Manage issues across multiple repositories
-- 🎨 Multiple output formats (TTY, table, JSON, CSV)
+- 🚀 **Dry-run Mode** - Preview changes before applying them
+- 🎨 **Multiple output formats** - Table, JSON, CSV, and quiet modes
 
 ## Installation
 
@@ -64,16 +65,19 @@ gh pm init --skip-metadata
 gh pm list
 
 # Create a new issue with priority
-gh pm create --title "Implement authentication" --priority high --label "backend"
+gh pm create --title "Implement authentication" --priority p1 --label "backend"
+
+# View issue details with project metadata
+gh pm view 123
 
 # Move issue to In Progress status
 gh pm move 123 --status in_progress
 
-# Add sub-task to an issue
-gh pm add-task 123 --title "Design database schema"
+# Run triage to bulk update issues
+gh pm triage tracked
 
-# Track progress
-gh pm status
+# Preview triage changes without applying
+gh pm triage estimate --list
 ```
 
 ## Core Commands
@@ -151,17 +155,27 @@ gh pm list --json number,title,priority,status
 
 #### Create Issue
 ```bash
-# Basic creation
+# Basic creation (will use defaults from .gh-pm.yml)
 gh pm create --title "Add user dashboard"
 
 # With full details
 gh pm create \
   --title "Implement REST API" \
   --body "Create RESTful endpoints for user management" \
-  --priority high \
+  --priority p0 \
+  --status ready \
   --assignee "@me" \
   --label "api,backend" \
   --milestone "v1.0"
+
+# Interactive mode (opens gh issue create interactively)
+gh pm create --interactive
+
+# Create from template
+gh pm create --template bug
+
+# Batch creation from file
+gh pm create --from-file issues.yml
 ```
 
 #### Move Issue (Update Project Fields)
@@ -198,39 +212,66 @@ The exact field values depend on your project configuration (`.gh-pm.yml`):
 - Field values are case-sensitive and must match your project configuration
 - Use `gh pm init` to see available values for your project
 
-### Task Decomposition
+### View Issue Details
 
-#### Add Sub-tasks
+#### View Command
 ```bash
-# Add a single task
-gh pm add-task 123 --title "Write unit tests"
+# View issue with project metadata
+gh pm view 123
 
-# Add multiple tasks from file
-gh pm add-tasks 123 --file tasks.md
+# View with project URL (shows GitHub Projects board URL)
+gh pm view 123 --quiet  # Only shows URLs
 
-# Interactive task creation
-gh pm add-task 123 --interactive
+# Open in web browser (opens project board view)
+gh pm view 123 --web
+
+# View with comments
+gh pm view 123 --comments
+
+# View in different output formats
+gh pm view 123 --output json
+gh pm view 123 --output csv
+
+# View issue in specific repository
+gh pm view 456 --repo owner/repo
 ```
 
-#### List Tasks
+### Triage Operations
+
+#### Triage Command
 ```bash
-# List all sub-tasks
-gh pm tasks 123
+# Run a triage configuration
+gh pm triage tracked  # Applies labels and project fields to untracked issues
 
-# Show completed tasks only
-gh pm tasks 123 --completed
+# Preview what would be changed (dry-run)
+gh pm triage estimate --list
+gh pm triage estimate --dry-run  # Same as --list
 
-# Tree view
-gh pm tasks 123 --tree
+# Interactive triage (prompts for each issue)
+gh pm triage estimate  # If configured with interactive fields
 ```
 
-#### Complete Tasks
-```bash
-# Mark task as complete
-gh pm complete-task 123 456
-
-# Bulk complete
-gh pm complete-tasks 123 --ids 456,457,458
+**Triage Configuration Example (.gh-pm.yml):**
+```yaml
+triage:
+  # Auto-add tracking label and set defaults
+  tracked:
+    query: "is:issue is:open -label:pm-tracked"
+    apply:
+      labels:
+        - pm-tracked
+      fields:
+        priority: p1
+        status: backlog
+    interactive:
+      status: true  # Prompt for status selection
+  
+  # Interactive estimation
+  estimate:
+    query: "is:issue is:open status:backlog -has:estimate"
+    apply: {}
+    interactive:
+      estimate: true  # Prompt for estimate entry
 ```
 
 ### Priority Management
@@ -307,18 +348,17 @@ fields:
   priority:
     field: "Priority"
     values:
-      low: "Low"        # or "P3"
-      medium: "Medium"  # or "P2"
-      high: "High"      # or "P1"
-      critical: "Critical"  # or "P0"
+      p0: "P0"          # Critical
+      p1: "P1"          # High
+      p2: "P2"          # Medium
   
   status:
     field: "Status"
     values:
-      todo: "Backlog"         # or "Todo"
-      ready: "Ready"          # if available
-      in_progress: "In Progress"
-      in_review: "In Review"
+      backlog: "Backlog"
+      ready: "Ready"
+      in_progress: "In progress"
+      in_review: "In review"
       done: "Done"
 
 # Metadata cache (auto-generated by init command)
@@ -408,6 +448,21 @@ gh pm watch --webhook https://example.com/hook
 # Generate daily report
 gh pm report daily --email team@example.com
 ```
+
+## Project URLs
+
+gh-pm automatically generates correct GitHub Projects board URLs for all issues. These URLs open directly in the project board view, making it easy to navigate between CLI and web interfaces.
+
+### URL Format
+- **User projects**: `https://github.com/users/{owner}/projects/{number}?pane=issue&itemId={id}`
+- **Organization projects**: `https://github.com/orgs/{org}/projects/{number}?pane=issue&itemId={id}`
+
+### Commands with Project URL Support
+- `gh pm view [issue]` - Shows project URL in output
+- `gh pm view [issue] --quiet` - Shows only the project URL
+- `gh pm view [issue] --web` - Opens project board in browser
+- `gh pm triage [name] --list` - Shows project URLs for all affected issues
+- `gh pm create` - Returns project URL after creation
 
 ## Output Formats
 
@@ -542,14 +597,19 @@ npm run build
 - [x] **Issue creation** with project metadata (`gh pm create`)
 - [x] **Project initialization** with auto-detection (`gh pm init`)
 - [x] **Issue status & priority updates** (`gh pm move`)
+- [x] **Issue viewing** with project metadata and URLs (`gh pm view`)
+- [x] **Triage operations** for bulk issue processing (`gh pm triage`)
 - [x] **Configuration management** with field mapping
 - [x] **Multiple output formats** (table, JSON, CSV)
+- [x] **Project URL generation** for direct GitHub Projects board access
+- [x] **Dry-run mode** for previewing changes before applying
 
 ### 🚧 In Development / Planned
 - [ ] Issue listing and filtering (`gh pm list`)
 - [ ] Bulk operations and CSV import/export
 - [ ] Task decomposition (`gh pm add-task`)
 - [ ] Progress tracking and reporting (`gh pm status`)
+- [ ] Sprint management features
 
 ### 🔮 Future Features
 - [ ] Sprint management (`gh pm sprint ...`)
