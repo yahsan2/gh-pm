@@ -18,4 +18,4 @@ jobs:
       - name: Build and Release
         uses: cli/gh-extension-precompile@v1
         with:
-          go_version: "1.21"
+          go_version_file: go.mod
