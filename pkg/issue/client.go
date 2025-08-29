@@ -35,6 +35,11 @@ func NewClient() (*Client, error) {
 	}, nil
 }
 
+// GetGraphQLClient returns the GraphQL client for direct use
+func (c *Client) GetGraphQLClient() *api.GraphQLClient {
+	return c.gql
+}
+
 // CreateIssue creates a new issue - delegates to Creator
 func (c *Client) CreateIssue(data *IssueData) (*Issue, error) {
 	creator := NewCreator(c)

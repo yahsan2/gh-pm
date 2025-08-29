@@ -94,13 +94,9 @@ func (m *MetadataManager) BuildMetadata(proj *project.Project, fields []project.
 			Options: options,
 		}
 		
-		// Assign to appropriate field based on name
-		switch {
-		case strings.EqualFold(field.Name, "Status"):
-			metadata.Fields.Status = fieldMeta
-		case strings.EqualFold(field.Name, "Priority"):
-			metadata.Fields.Priority = fieldMeta
-		}
+		// Store field metadata with field name as key
+		// Using the actual field name to support dynamic field names
+		metadata.Fields[field.Name] = fieldMeta
 	}
 	
 	return metadata, nil

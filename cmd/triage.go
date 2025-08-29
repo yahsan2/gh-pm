@@ -218,8 +218,45 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 }
 
 func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
-	// For now, use gh issue list to get issues and filter locally
-	// This works around the search API permission issues
+	// Parse query to extract field filters
+	fieldFilters := make(map[string]string) // field name -> filter value
+	var labelExcludes []string
+	
+	// Get available field names from metadata
+	availableFields := make(map[string]bool)
+	if c.config.Metadata != nil && c.config.Metadata.Fields != nil {
+		for fieldName := range c.config.Metadata.Fields {
+			availableFields[fieldName] = true
+		}
+	}
+	
+	parts := strings.Split(query, " ")
+	for _, part := range parts {
+		// Check for label exclusions
+		if strings.HasPrefix(part, "-label:") {
+			labelExcludes = append(labelExcludes, strings.TrimPrefix(part, "-label:"))
+			continue
+		}
+		
+		// Check for field filters dynamically
+		if strings.Contains(part, ":") {
+			colonIdx := strings.Index(part, ":")
+			fieldName := part[:colonIdx]
+			fieldValue := part[colonIdx+1:]
+			
+			// If this field exists in metadata, add it to filters
+			if availableFields[fieldName] {
+				fieldFilters[fieldName] = fieldValue
+			}
+		}
+	}
+	
+	// If we have field filters and project metadata, use optimized GraphQL query
+	if len(fieldFilters) > 0 && c.config.Metadata != nil && c.config.Metadata.Project.ID != "" {
+		return c.searchIssuesWithProjectFields(fieldFilters, labelExcludes)
+	}
+	
+	// Fallback to original implementation for label-only filters
 	var repo string
 	if len(c.config.Repositories) > 0 {
 		repo = c.config.Repositories[0]
@@ -254,30 +291,30 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 		return nil, fmt.Errorf("failed to parse issues: %w", err)
 	}
 	
-	// Filter based on query (basic implementation for -label:pm-tracked)
+	// Filter based on query (for label-only filtering)
 	var filteredIssues []GitHubIssue
 	for _, issue := range allIssues {
-		// Check if query excludes pm-tracked label
-		if strings.Contains(query, "-label:pm-tracked") {
-			hasLabel := false
+		// Check label exclusions
+		skipItem := false
+		for _, excludeLabel := range labelExcludes {
 			for _, label := range issue.Labels {
-				if label.Name == "pm-tracked" {
-					hasLabel = true
+				if label.Name == excludeLabel {
+					skipItem = true
 					break
 				}
 			}
-			// Skip if issue has pm-tracked label
-			if hasLabel {
-				continue
+			if skipItem {
+				break
 			}
 		}
-		
-		filteredIssues = append(filteredIssues, GitHubIssue{
-			Number: issue.Number,
-			Title:  issue.Title,
-			ID:     issue.ID,
-			URL:    issue.URL,
-		})
+		if !skipItem {
+			filteredIssues = append(filteredIssues, GitHubIssue{
+				Number: issue.Number,
+				Title:  issue.Title,
+				ID:     issue.ID,
+				URL:    issue.URL,
+			})
+		}
 	}
 	
 	fmt.Printf("Found %d open issues, %d match query criteria\n", len(allIssues), len(filteredIssues))
@@ -481,6 +518,188 @@ func (c *TriageCommand) handleInteractiveEstimate(projectID, itemID string, issu
 	fmt.Printf("✓ Set estimate '%s' for issue #%d (estimate field update not fully implemented)\n", input, issue.Number)
 	return nil
 }
+
+func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]string, labelExcludes []string) ([]GitHubIssue, error) {
+	projectID := c.config.Metadata.Project.ID
+	
+	// Build GraphQL query to get all project items with field values
+	query := `
+		query($projectId: ID!, $endCursor: String) {
+			node(id: $projectId) {
+				... on ProjectV2 {
+					items(first: 100, after: $endCursor) {
+						pageInfo {
+							hasNextPage
+							endCursor
+						}
+						nodes {
+							id
+							databaseId
+							content {
+								... on Issue {
+									id
+									number
+									title
+									url
+									state
+									labels(first: 100) {
+										nodes {
+											name
+										}
+									}
+								}
+							}
+							fieldValues(first: 20) {
+								nodes {
+									... on ProjectV2ItemFieldSingleSelectValue {
+										field {
+											... on ProjectV2SingleSelectField {
+												id
+												name
+											}
+										}
+										optionId
+										name
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}`
+	
+	var allItems []GitHubIssue
+	var endCursor *string
+	
+	// Prepare field option IDs to filter by
+	filterOptionIDs := make(map[string]string) // fieldID -> optionID
+	
+	// Map field filters to option IDs using metadata dynamically
+	for fieldName, filterValue := range fieldFilters {
+		if c.config.Metadata.Fields != nil {
+			if fieldMeta, exists := c.config.Metadata.Fields[fieldName]; exists && fieldMeta != nil && filterValue != "" {
+				if optionID, ok := fieldMeta.Options[filterValue]; ok {
+					filterOptionIDs[fieldMeta.ID] = optionID
+				}
+			}
+		}
+	}
+	
+	fmt.Printf("Fetching project items with field values...\n")
+	
+	// Paginate through all project items
+	for {
+		variables := map[string]interface{}{
+			"projectId": projectID,
+		}
+		if endCursor != nil {
+			variables["endCursor"] = *endCursor
+		}
+		
+		var result struct {
+			Node struct {
+				Items struct {
+					PageInfo struct {
+						HasNextPage bool   `json:"hasNextPage"`
+						EndCursor   string `json:"endCursor"`
+					} `json:"pageInfo"`
+					Nodes []struct {
+						ID         string `json:"id"`
+						DatabaseID int    `json:"databaseId"`
+						Content    struct {
+							ID     string `json:"id"`
+							Number int    `json:"number"`
+							Title  string `json:"title"`
+							URL    string `json:"url"`
+							State  string `json:"state"`
+							Labels struct {
+								Nodes []struct {
+									Name string `json:"name"`
+								} `json:"nodes"`
+							} `json:"labels"`
+						} `json:"content"`
+						FieldValues struct {
+							Nodes []struct {
+								Field struct {
+									ID   string `json:"id"`
+									Name string `json:"name"`
+								} `json:"field"`
+								OptionID string `json:"optionId"`
+								Name     string `json:"name"`
+							} `json:"nodes"`
+						} `json:"fieldValues"`
+					} `json:"nodes"`
+				} `json:"items"`
+			} `json:"node"`
+		}
+		
+		err := c.issueAPI.GetGraphQLClient().Do(query, variables, &result)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch project items: %w", err)
+		}
+		
+		// Process items
+		for _, item := range result.Node.Items.Nodes {
+			// Skip if not an issue or closed
+			if item.Content.Number == 0 || item.Content.State != "OPEN" {
+				continue
+			}
+			
+			// Check label exclusions
+			skipItem := false
+			for _, excludeLabel := range labelExcludes {
+				for _, label := range item.Content.Labels.Nodes {
+					if label.Name == excludeLabel {
+						skipItem = true
+						break
+					}
+				}
+				if skipItem {
+					break
+				}
+			}
+			if skipItem {
+				continue
+			}
+			
+			// Check field filters
+			matchesAllFilters := true
+			for fieldID, requiredOptionID := range filterOptionIDs {
+				found := false
+				for _, fieldValue := range item.FieldValues.Nodes {
+					if fieldValue.Field.ID == fieldID && fieldValue.OptionID == requiredOptionID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					matchesAllFilters = false
+					break
+				}
+			}
+			
+			if matchesAllFilters {
+				allItems = append(allItems, GitHubIssue{
+					Number: item.Content.Number,
+					Title:  item.Content.Title,
+					ID:     item.Content.ID,
+					URL:    item.Content.URL,
+				})
+			}
+		}
+		
+		// Check if there are more pages
+		if !result.Node.Items.PageInfo.HasNextPage {
+			break
+		}
+		endCursor = &result.Node.Items.PageInfo.EndCursor
+	}
+	
+	fmt.Printf("Found %d issues matching criteria\n", len(allItems))
+	return allItems, nil
+}
+
 
 func (c *TriageCommand) displayIssuesList(issues []GitHubIssue, triageConfig config.TriageConfig) error {
 	// Display issues that would be affected

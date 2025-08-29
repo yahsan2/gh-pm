@@ -73,11 +73,8 @@ type ProjectMetadata struct {
 	ID string `yaml:"id"` // Node ID (e.g., "PVT_kwHOAAlRwM4A8arc")
 }
 
-// FieldsMetadata represents cached field metadata
-type FieldsMetadata struct {
-	Status   *FieldMetadata `yaml:"status,omitempty"`
-	Priority *FieldMetadata `yaml:"priority,omitempty"`
-}
+// FieldsMetadata represents cached field metadata as a dynamic map
+type FieldsMetadata map[string]*FieldMetadata
 
 // FieldMetadata represents cached field IDs and options
 type FieldMetadata struct {
@@ -306,18 +303,15 @@ func (c *Config) SetProjectID(id string) {
 
 // GetFieldMetadata returns metadata for a specific field
 func (c *Config) GetFieldMetadata(fieldName string) *FieldMetadata {
-	if c.Metadata == nil || c.Metadata.Fields.Status == nil {
+	if c.Metadata == nil || c.Metadata.Fields == nil {
 		return nil
 	}
 	
-	switch fieldName {
-	case "status":
-		return c.Metadata.Fields.Status
-	case "priority":
-		return c.Metadata.Fields.Priority
-	default:
-		return nil
+	if fieldMeta, exists := c.Metadata.Fields[fieldName]; exists {
+		return fieldMeta
 	}
+	
+	return nil
 }
 
 // isValidRepository checks if a repository string is in the correct format
