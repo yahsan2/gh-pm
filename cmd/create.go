@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -103,11 +106,6 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		createTitle = strings.Join(args, " ")
 	}
 	
-	// Validate basic requirements
-	if createTitle == "" && createFromFile == "" && createTemplate == "" && !createInteractive {
-		return fmt.Errorf("issue title is required (use --title, --from-file, --template, or --interactive)")
-	}
-	
 	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
@@ -167,27 +165,142 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	return command.Execute(createTitle)
 }
 
+// CallGHIssueCreate calls gh issue create command and returns the created issue information
+func CallGHIssueCreate(title, body, repo string, labels []string) (*issue.Issue, error) {
+	// Build gh issue create command
+	args := []string{"issue", "create"}
+	
+	// If title is empty, gh will use interactive mode
+	if title == "" {
+		// Interactive mode - capture output to get issue URL
+		if body != "" {
+			args = append(args, "--body", body)
+		}
+		if repo != "" {
+			args = append(args, "--repo", repo)
+		}
+		for _, label := range labels {
+			args = append(args, "--label", label)
+		}
+		
+		// Execute gh command with interactive mode
+		cmd := exec.Command("gh", args...)
+		cmd.Stdin = os.Stdin  // Connect stdin for interactive prompt
+		
+		// Use pipe to capture output while still showing it to the user
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create issue: %w", err)
+		}
+		
+		// Print the output to the user
+		fmt.Print(string(output))
+		
+		// Parse the output to find the issue URL and extract the number
+		lines := strings.Split(string(output), "\n")
+		var issueNumber int
+		for _, line := range lines {
+			// Look for the issue URL in the output
+			if strings.Contains(line, "github.com") && strings.Contains(line, "/issues/") {
+				// Extract issue number from URL
+				parts := strings.Split(line, "/issues/")
+				if len(parts) == 2 {
+					// Clean the number part and parse it
+					numStr := strings.TrimSpace(parts[1])
+					// Remove any trailing characters
+					for i, ch := range numStr {
+						if ch < '0' || ch > '9' {
+							numStr = numStr[:i]
+							break
+						}
+					}
+					if num, err := strconv.Atoi(numStr); err == nil {
+						issueNumber = num
+						break
+					}
+				}
+			}
+		}
+		
+		if issueNumber == 0 {
+			return nil, fmt.Errorf("could not extract issue number from output")
+		}
+		
+		return issue.GetIssueDetails(issueNumber, repo)
+	}
+	
+	// Non-interactive mode
+	if title != "" {
+		args = append(args, "--title", title)
+	}
+	
+	if body != "" {
+		args = append(args, "--body", body)
+	}
+	
+	if repo != "" {
+		args = append(args, "--repo", repo)
+	}
+	
+	for _, label := range labels {
+		args = append(args, "--label", label)
+	}
+	
+	// Execute gh command
+	cmd := exec.Command("gh", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create issue: %w\noutput: %s", err, string(output))
+	}
+	
+	// Parse the output to find the issue URL and extract the number
+	lines := strings.Split(string(output), "\n")
+	var issueNumber int
+	for _, line := range lines {
+		// Look for the issue URL in the output
+		if strings.Contains(line, "github.com") && strings.Contains(line, "/issues/") {
+			// Extract issue number from URL
+			parts := strings.Split(line, "/issues/")
+			if len(parts) == 2 {
+				// Clean the number part and parse it
+				numStr := strings.TrimSpace(parts[1])
+				// Remove any trailing characters
+				for i, ch := range numStr {
+					if ch < '0' || ch > '9' {
+						numStr = numStr[:i]
+						break
+					}
+				}
+				if num, err := strconv.Atoi(numStr); err == nil {
+					issueNumber = num
+					break
+				}
+			}
+		}
+	}
+	
+	if issueNumber == 0 {
+		return nil, fmt.Errorf("could not extract issue number from output: %s", string(output))
+	}
+	
+	// Get full issue details
+	return issue.GetIssueDetails(issueNumber, repo)
+}
+
 func (c *CreateCommand) Execute(title string) error {
 	// Prepare issue data
-	issueData := &issue.IssueData{
-		Title:      title,
-		Body:       createBody,
-		Labels:     c.mergeLabels(),
-		Repository: c.selectRepository(),
-		Priority:   c.selectPriority(),
-		Status:     c.selectStatus(),
-	}
+	repo := c.selectRepository()
+	labels := c.mergeLabels()
 	
-	// Validate issue data
-	if err := issueData.Validate(); err != nil {
-		return fmt.Errorf("invalid issue data: %w", err)
-	}
-	
-	// Create issue
-	createdIssue, err := c.issueAPI.CreateIssue(issueData)
+	// Call gh issue create command
+	createdIssue, err := CallGHIssueCreate(title, createBody, repo, labels)
 	if err != nil {
 		return fmt.Errorf("failed to create issue: %w", err)
 	}
+	
+	// Set these for project field updates
+	priority := c.selectPriority()
+	status := c.selectStatus()
 	
 	// Add to project if configured
 	var projectURL string
@@ -254,16 +367,16 @@ func (c *CreateCommand) Execute(title string) error {
 		}
 		
 		// Update Status field if configured
-		if issueData.Status != "" {
-			if err := c.updateProjectField(projectID, itemID, "Status", issueData.Status, fields); err != nil {
+		if status != "" {
+			if err := c.updateProjectField(projectID, itemID, "Status", status, fields); err != nil {
 				// Log error but don't fail the whole operation
 				fmt.Printf("Warning: failed to update status field: %v\n", err)
 			}
 		}
 		
 		// Update Priority field if configured
-		if issueData.Priority != "" {
-			if err := c.updateProjectField(projectID, itemID, "Priority", issueData.Priority, fields); err != nil {
+		if priority != "" {
+			if err := c.updateProjectField(projectID, itemID, "Priority", priority, fields); err != nil {
 				// Log error but don't fail the whole operation
 				fmt.Printf("Warning: failed to update priority field: %v\n", err)
 			}

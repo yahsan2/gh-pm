@@ -1,7 +1,11 @@
 package issue
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"os/exec"
+	"strconv"
 	
 	"github.com/cli/go-gh/v2/pkg/api"
 )
@@ -144,4 +148,43 @@ func (c *Client) UpdateProjectItemField(projectID, itemID, fieldID, optionID str
 	}
 	
 	return nil
+}
+
+// GetIssueDetails fetches issue details using gh issue view command
+func GetIssueDetails(number int, repo string) (*Issue, error) {
+	args := []string{"issue", "view", strconv.Itoa(number), "--json", "id,number,title,url,state"}
+	
+	if repo != "" {
+		args = append(args, "--repo", repo)
+	}
+	
+	cmd := exec.Command("gh", args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("failed to get issue details: %w\nstderr: %s", err, stderr.String())
+	}
+	
+	var result struct {
+		ID     string `json:"id"`
+		Number int    `json:"number"`
+		Title  string `json:"title"`
+		URL    string `json:"url"`
+		State  string `json:"state"`
+	}
+	
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse gh output: %w", err)
+	}
+	
+	return &Issue{
+		ID:         result.ID,
+		Number:     result.Number,
+		Title:      result.Title,
+		URL:        result.URL,
+		State:      result.State,
+		Repository: repo,
+	}, nil
 }

@@ -73,7 +73,6 @@ func (f *Formatter) formatIssueTable(issue *issue.Issue) error {
 	w := tabwriter.NewWriter(f.writer, 0, 0, 2, ' ', 0)
 	defer w.Flush()
 	
-	fmt.Fprintf(w, "Issue created successfully!\n\n")
 	fmt.Fprintf(w, "Number:\t#%d\n", issue.Number)
 	fmt.Fprintf(w, "Title:\t%s\n", issue.Title)
 	fmt.Fprintf(w, "URL:\t%s\n", issue.URL)
