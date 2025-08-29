@@ -13,11 +13,12 @@ const ConfigFileName = ".gh-pm.yml"
 
 // Config represents the project configuration
 type Config struct {
-	Project      ProjectConfig      `yaml:"project"`
-	Repositories []string           `yaml:"repositories"`
-	Defaults     DefaultsConfig     `yaml:"defaults"`
-	Fields       map[string]Field   `yaml:"fields"`
-	Metadata     *ConfigMetadata    `yaml:"metadata,omitempty"`
+	Project      ProjectConfig             `yaml:"project"`
+	Repositories []string                  `yaml:"repositories"`
+	Defaults     DefaultsConfig            `yaml:"defaults"`
+	Fields       map[string]Field          `yaml:"fields"`
+	Triage       map[string]TriageConfig   `yaml:"triage,omitempty"`
+	Metadata     *ConfigMetadata           `yaml:"metadata,omitempty"`
 }
 
 // ProjectConfig represents project settings
@@ -39,6 +40,25 @@ type DefaultsConfig struct {
 type Field struct {
 	Field  string            `yaml:"field"`
 	Values map[string]string `yaml:"values"`
+}
+
+// TriageConfig represents a triage configuration
+type TriageConfig struct {
+	Query       string            `yaml:"query"`
+	Apply       TriageApply       `yaml:"apply"`
+	Interactive TriageInteractive `yaml:"interactive,omitempty"`
+}
+
+// TriageApply represents what to apply during triage
+type TriageApply struct {
+	Labels []string             `yaml:"labels,omitempty"`
+	Fields map[string]string    `yaml:"fields,omitempty"`
+}
+
+// TriageInteractive represents interactive options for triage
+type TriageInteractive struct {
+	Status   bool `yaml:"status,omitempty"`
+	Estimate bool `yaml:"estimate,omitempty"`
 }
 
 
@@ -94,6 +114,28 @@ func DefaultConfig() *Config {
 					"in_progress": "In Progress",
 					"in_review":   "In Review",
 					"done":        "Done",
+				},
+			},
+		},
+		Triage: map[string]TriageConfig{
+			"tracked": {
+				Query: "is:issue is:open -label:pm-tracked",
+				Apply: TriageApply{
+					Labels: []string{"pm-tracked"},
+					Fields: map[string]string{
+						"status":   "backlog",
+						"priority": "p1",
+					},
+				},
+				Interactive: TriageInteractive{
+					Status: true,
+				},
+			},
+			"estimate": {
+				Query: "is:issue is:open -has:estimate",
+				Apply: TriageApply{},
+				Interactive: TriageInteractive{
+					Estimate: true,
 				},
 			},
 		},

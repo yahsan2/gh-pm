@@ -24,6 +24,22 @@ fields:
             in_progress: In progress
             in_review: In review
             ready: Ready
+triage:
+    estimate:
+        query: is:issue is:open -has:estimate
+        apply: {}
+        interactive:
+            estimate: true
+    tracked:
+        query: is:issue is:open -label:pm-tracked
+        apply:
+            labels:
+                - pm-tracked
+            fields:
+                priority: p1
+                status: backlog
+        interactive:
+            status: true
 metadata:
     project:
         id: PVT_kwHOAAlRwM4BBvYB
