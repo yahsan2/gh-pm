@@ -18,4 +18,4 @@ jobs:
       - name: Build and Release
         uses: cli/gh-extension-precompile@v2
         with:
-          build_args: -ldflags "-X github.com/yahsan2/gh-pm/cmd.Version=${{ github.ref_name }}"
+          go_build_options: -ldflags "-X github.com/yahsan2/gh-pm/cmd.Version=${{ github.ref_name }}"
