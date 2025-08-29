@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -172,4 +173,117 @@ func (c *Config) LoadMetadata() (*ConfigMetadata, error) {
 		return nil, fmt.Errorf("no metadata found in configuration")
 	}
 	return c.Metadata, nil
+}
+
+// LoadConfig loads configuration from file with enhanced error handling
+func LoadConfig() (*Config, error) {
+	configPath := findConfigFile()
+	if configPath == "" {
+		return nil, fmt.Errorf("configuration file %s not found in current or parent directories", ConfigFileName)
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file at %s: %w", configPath, err)
+	}
+
+	var config Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	return &config, nil
+}
+
+// Validate checks if the configuration is valid
+func (c *Config) Validate() error {
+	// Check required fields
+	if c.Project.Name == "" && c.Project.Number == 0 {
+		return fmt.Errorf("project name or number is required")
+	}
+	
+	if len(c.Repositories) == 0 {
+		return fmt.Errorf("at least one repository must be configured")
+	}
+	
+	// Validate repository format
+	for _, repo := range c.Repositories {
+		if !isValidRepository(repo) {
+			return fmt.Errorf("invalid repository format '%s': must be 'owner/repo'", repo)
+		}
+	}
+	
+	// Validate field mappings
+	if c.Fields != nil {
+		for name, field := range c.Fields {
+			if field.Field == "" {
+				return fmt.Errorf("field name is required for '%s'", name)
+			}
+			if len(field.Values) == 0 {
+				return fmt.Errorf("at least one value mapping is required for field '%s'", name)
+			}
+		}
+	}
+	
+	// Validate defaults against field mappings
+	if c.Defaults.Priority != "" {
+		if priority, ok := c.Fields["priority"]; ok {
+			if _, exists := priority.Values[c.Defaults.Priority]; !exists {
+				return fmt.Errorf("default priority '%s' is not defined in field mappings", c.Defaults.Priority)
+			}
+		}
+	}
+	
+	if c.Defaults.Status != "" {
+		if status, ok := c.Fields["status"]; ok {
+			if _, exists := status.Values[c.Defaults.Status]; !exists {
+				return fmt.Errorf("default status '%s' is not defined in field mappings", c.Defaults.Status)
+			}
+		}
+	}
+	
+	return nil
+}
+
+// GetProjectID returns the cached project ID if available
+func (c *Config) GetProjectID() string {
+	if c.Metadata != nil && c.Metadata.Project.ID != "" {
+		return c.Metadata.Project.ID
+	}
+	return ""
+}
+
+// SetProjectID sets the project ID in metadata
+func (c *Config) SetProjectID(id string) {
+	if c.Metadata == nil {
+		c.Metadata = &ConfigMetadata{}
+	}
+	c.Metadata.Project.ID = id
+}
+
+// GetFieldMetadata returns metadata for a specific field
+func (c *Config) GetFieldMetadata(fieldName string) *FieldMetadata {
+	if c.Metadata == nil || c.Metadata.Fields.Status == nil {
+		return nil
+	}
+	
+	switch fieldName {
+	case "status":
+		return c.Metadata.Fields.Status
+	case "priority":
+		return c.Metadata.Fields.Priority
+	default:
+		return nil
+	}
+}
+
+// isValidRepository checks if a repository string is in the correct format
+func isValidRepository(repo string) bool {
+	parts := strings.Split(repo, "/")
+	return len(parts) == 2 && parts[0] != "" && parts[1] != ""
+}
+
+// FindConfigPath returns the path to the configuration file
+func FindConfigPath() string {
+	return findConfigFile()
 }

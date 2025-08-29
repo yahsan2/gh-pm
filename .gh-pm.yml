@@ -1,25 +1,44 @@
 project:
-    name: gh-pm
+    name: gh-pm project
+    number: 8
     org: yahsan2
 repositories:
     - yahsan2/gh-pm
 defaults:
     priority: medium
-    status: Todo
+    status: todo
     labels:
         - pm-tracked
 fields:
     priority:
         field: Priority
         values:
-            critical: Critical
-            high: High
-            low: Low
-            medium: Medium
+            critical: P0
+            high: P1
+            medium: P2
     status:
         field: Status
         values:
             done: Done
-            in_progress: In Progress
-            in_review: In Review
-            todo: Todo
+            in_progress: In progress
+            in_review: In review
+            ready: Ready
+            todo: Backlog
+metadata:
+    project:
+        id: PVT_kwHOAAlRwM4BBvYB
+    fields:
+        status:
+            id: PVTSSF_lAHOAAlRwM4BBvYBzg0KEU0
+            options:
+                done: "98236657"
+                in_progress: 47fc9ee4
+                in_review: df73e18b
+                ready: 61e4505c
+                todo: f75ad846
+        priority:
+            id: PVTSSF_lAHOAAlRwM4BBvYBzg0KEX4
+            options:
+                critical: "79628723"
+                high: 0a877460
+                medium: da944a9c
