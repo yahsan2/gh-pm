@@ -17,3 +17,6 @@ jobs:
         
       - name: Build and Release
         uses: cli/gh-extension-precompile@v2
+        env:
+          # gh-extension-precompile will automatically set version from tag
+          GO_LDFLAGS: "-X github.com/yahsan2/gh-pm/cmd.Version=${{ github.ref_name }}"

@@ -3,6 +3,10 @@
 # Variables
 BINARY_NAME=gh-pm
 GO_FILES=$(shell find . -name '*.go' -type f)
+VERSION?=dev
+COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+LDFLAGS=-ldflags "-X github.com/yahsan2/gh-pm/cmd.Version=$(VERSION) -X github.com/yahsan2/gh-pm/cmd.Commit=$(COMMIT) -X github.com/yahsan2/gh-pm/cmd.Date=$(DATE)"
 
 # Default target
 all: build
@@ -17,7 +21,7 @@ help:
 
 ## build: Build the binary
 build:
-	go build -o $(BINARY_NAME) .
+	go build $(LDFLAGS) -o $(BINARY_NAME) .
 
 ## install: Install as gh extension
 install: build
