@@ -31,6 +31,18 @@ triage:
         apply: {}
         interactive:
             estimate: true
+    high-priority:
+        query: is:issue is:open priority:p0
+        apply: {}
+        interactive: {}
+    medium-priority:
+        query: is:issue is:open priority:p1
+        apply: {}
+        interactive: {}
+    backlog-p1:
+        query: is:issue is:open status:backlog priority:p1
+        apply: {}
+        interactive: {}
     tracked:
         query: is:issue is:open -label:pm-tracked
         apply:
@@ -53,9 +65,10 @@ metadata:
                 in_review: df73e18b
                 ready: 61e4505c
                 todo: f75ad846
+                backlog: f75ad846
         priority:
             id: PVTSSF_lAHOAAlRwM4BBvYBzg0KEX4
             options:
-                critical: "79628723"
-                high: 0a877460
-                medium: da944a9c
+                p0: "79628723"
+                p1: 0a877460
+                p2: da944a9c
