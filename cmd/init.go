@@ -146,10 +146,27 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// If interactive mode and project still not set, prompt for it
 	if initInteractive && initProject == "" {
-		fmt.Print("Enter project name (leave empty to skip): ")
+		// Use repo name as default if available
+		defaultName := ""
+		if repoErr == nil {
+			defaultName = repo
+		}
+		
+		if defaultName != "" {
+			fmt.Printf("Enter project name (default: %s, leave empty to skip): ", defaultName)
+		} else {
+			fmt.Print("Enter project name (leave empty to skip): ")
+		}
+		
 		scanner := bufio.NewScanner(os.Stdin)
 		if scanner.Scan() {
-			initProject = strings.TrimSpace(scanner.Text())
+			input := strings.TrimSpace(scanner.Text())
+			if input == "" && defaultName != "" {
+				// Use default if no input provided
+				initProject = defaultName
+			} else if input != "" {
+				initProject = input
+			}
 		}
 	}
 
