@@ -203,15 +203,54 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// If project is specified, try to fetch project details
-	if cfg.Project.Name != "" && cfg.Project.Org != "" && cfg.Project.Number == 0 {
+	if cfg.Project.Name != "" && cfg.Project.Number == 0 {
 		fmt.Printf("Fetching project details from GitHub...\n")
 		
 		client, err := project.NewClient()
 		if err != nil {
 			fmt.Printf("Warning: Could not connect to GitHub: %v\n", err)
 		} else {
-			proj, err := client.GetProject(cfg.Project.Org, cfg.Project.Name, 0)
-			if err != nil {
+			var proj *project.Project
+			
+			// Try as organization project first if org is specified
+			if cfg.Project.Org != "" {
+				proj, err = client.GetProject(cfg.Project.Org, cfg.Project.Name, 0)
+			}
+			
+			// If failed or no org specified, try as user project
+			if proj == nil || err != nil {
+				// Extract owner from repository if available
+				var owner string
+				if len(cfg.Repositories) > 0 {
+					parts := strings.Split(cfg.Repositories[0], "/")
+					if len(parts) == 2 {
+						owner = parts[0]
+					}
+				}
+				
+				// Try with owner as user
+				if owner != "" {
+					userProj, userErr := client.GetUserProject(owner, cfg.Project.Name, 0)
+					if userErr == nil {
+						proj = userProj
+						err = nil
+						// Clear org since it's a user project
+						cfg.Project.Org = ""
+					}
+				}
+				
+				// If still no project, try current user
+				if proj == nil {
+					userProj, userErr := client.GetCurrentUserProject(cfg.Project.Name, 0)
+					if userErr == nil {
+						proj = userProj
+						err = nil
+						cfg.Project.Org = ""
+					}
+				}
+			}
+			
+			if err != nil || proj == nil {
 				fmt.Printf("Warning: Could not fetch project details: %v\n", err)
 			} else {
 				cfg.Project.Number = proj.Number
@@ -223,6 +262,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 					fmt.Println("\nAvailable project fields:")
 					for _, field := range fields {
 						fmt.Printf("  - %s (%s)\n", field.Name, field.DataType)
+					}
+					
+					// Auto-configure field mappings in non-interactive mode
+					if !initInteractive {
+						autoConfigureFieldMappings(cfg, fields)
 					}
 					
 					// Build metadata if not skipping
@@ -395,6 +439,95 @@ func selectProjectWithDetails(projects []project.Project, source string) *projec
 }
 
 // configureFieldMappings allows user to configure field mappings for the selected project
+// autoConfigureFieldMappings automatically configures field mappings without user interaction
+func autoConfigureFieldMappings(cfg *config.Config, fields []project.Field) {
+	// Look for Status field
+	for _, field := range fields {
+		if strings.EqualFold(field.Name, "status") && field.DataType == "SINGLE_SELECT" && len(field.Options) > 0 {
+			statusMapping := config.Field{
+				Field:  "Status",
+				Values: make(map[string]string),
+			}
+			
+			// Set the first status option as the default
+			firstOption := field.Options[0].Name
+			normalizedKey := strings.ToLower(strings.ReplaceAll(firstOption, " ", "_"))
+			cfg.Defaults.Status = normalizedKey
+			
+			// Map all status options using their normalized names as keys
+			for _, opt := range field.Options {
+				normalizedKey := strings.ToLower(strings.ReplaceAll(opt.Name, " ", "_"))
+				statusMapping.Values[normalizedKey] = opt.Name
+				
+				// Also add common aliases
+				lowerOpt := strings.ToLower(opt.Name)
+				if strings.Contains(lowerOpt, "todo") && normalizedKey != "todo" {
+					statusMapping.Values["todo"] = opt.Name
+				}
+				if strings.Contains(lowerOpt, "backlog") && normalizedKey != "backlog" {
+					statusMapping.Values["backlog"] = opt.Name
+				}
+				if strings.Contains(lowerOpt, "progress") && normalizedKey != "in_progress" {
+					statusMapping.Values["in_progress"] = opt.Name
+				}
+				if strings.Contains(lowerOpt, "review") && normalizedKey != "in_review" {
+					statusMapping.Values["in_review"] = opt.Name
+				}
+				if strings.Contains(lowerOpt, "done") && normalizedKey != "done" {
+					statusMapping.Values["done"] = opt.Name
+				}
+			}
+			
+			cfg.Fields["status"] = statusMapping
+			fmt.Printf("✓ Auto-configured Status field mappings\n")
+			break
+		}
+	}
+	
+	// Look for Priority field
+	for _, field := range fields {
+		if strings.EqualFold(field.Name, "priority") && field.DataType == "SINGLE_SELECT" && len(field.Options) > 0 {
+			priorityMapping := config.Field{
+				Field:  "Priority",
+				Values: make(map[string]string),
+			}
+			
+			// Set default priority to middle option
+			middleIndex := len(field.Options) / 2
+			if middleIndex < len(field.Options) {
+				defaultPriority := field.Options[middleIndex].Name
+				normalizedKey := strings.ToLower(strings.ReplaceAll(defaultPriority, " ", "_"))
+				cfg.Defaults.Priority = normalizedKey
+			}
+			
+			// Map all priority options using their normalized names as keys
+			for _, opt := range field.Options {
+				normalizedKey := strings.ToLower(strings.ReplaceAll(opt.Name, " ", "_"))
+				priorityMapping.Values[normalizedKey] = opt.Name
+				
+				// Also add common aliases
+				lowerOpt := strings.ToLower(opt.Name)
+				if (strings.Contains(lowerOpt, "p0") || strings.Contains(lowerOpt, "critical")) && normalizedKey != "critical" {
+					priorityMapping.Values["critical"] = opt.Name
+				}
+				if (strings.Contains(lowerOpt, "p1") || strings.Contains(lowerOpt, "high")) && normalizedKey != "high" {
+					priorityMapping.Values["high"] = opt.Name
+				}
+				if (strings.Contains(lowerOpt, "p2") || strings.Contains(lowerOpt, "medium")) && normalizedKey != "medium" {
+					priorityMapping.Values["medium"] = opt.Name
+				}
+				if (strings.Contains(lowerOpt, "p3") || strings.Contains(lowerOpt, "low")) && normalizedKey != "low" {
+					priorityMapping.Values["low"] = opt.Name
+				}
+			}
+			
+			cfg.Fields["priority"] = priorityMapping
+			fmt.Printf("✓ Auto-configured Priority field mappings\n")
+			break
+		}
+	}
+}
+
 func configureFieldMappings(cfg *config.Config, proj *project.Project, client *project.Client) {
 	fmt.Println("\nFetching project fields...")
 	
@@ -442,20 +575,40 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 			Values: make(map[string]string),
 		}
 		
-		// Map common status names automatically
+		// Set the first status option as the default
+		if len(statusField.Options) > 0 {
+			firstOption := statusField.Options[0].Name
+			// Create a normalized key from the actual value
+			normalizedKey := strings.ToLower(strings.ReplaceAll(firstOption, " ", "_"))
+			cfg.Defaults.Status = normalizedKey
+			statusMapping.Values[normalizedKey] = firstOption
+		}
+		
+		// Map all status options using their normalized names as keys
 		for _, opt := range statusField.Options {
+			// Create normalized key from the actual option name
+			normalizedKey := strings.ToLower(strings.ReplaceAll(opt.Name, " ", "_"))
+			statusMapping.Values[normalizedKey] = opt.Name
+			
+			// Also add common aliases for convenience
 			lowerOpt := strings.ToLower(opt.Name)
 			switch {
-			case strings.Contains(lowerOpt, "todo") || strings.Contains(lowerOpt, "backlog"):
+			case strings.Contains(lowerOpt, "todo") && normalizedKey != "todo":
 				statusMapping.Values["todo"] = opt.Name
-			case strings.Contains(lowerOpt, "ready"):
+			case strings.Contains(lowerOpt, "backlog") && normalizedKey != "backlog":
+				statusMapping.Values["backlog"] = opt.Name
+			case strings.Contains(lowerOpt, "ready") && normalizedKey != "ready":
 				statusMapping.Values["ready"] = opt.Name
-			case strings.Contains(lowerOpt, "progress") || strings.Contains(lowerOpt, "doing"):
+			case strings.Contains(lowerOpt, "progress") && normalizedKey != "in_progress":
 				statusMapping.Values["in_progress"] = opt.Name
-			case strings.Contains(lowerOpt, "review"):
+			case strings.Contains(lowerOpt, "doing") && normalizedKey != "doing":
+				statusMapping.Values["doing"] = opt.Name
+			case strings.Contains(lowerOpt, "review") && normalizedKey != "in_review":
 				statusMapping.Values["in_review"] = opt.Name
-			case strings.Contains(lowerOpt, "done") || strings.Contains(lowerOpt, "complete"):
+			case strings.Contains(lowerOpt, "done") && normalizedKey != "done":
 				statusMapping.Values["done"] = opt.Name
+			case strings.Contains(lowerOpt, "complete") && normalizedKey != "complete":
+				statusMapping.Values["complete"] = opt.Name
 			}
 		}
 		
@@ -515,17 +668,43 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 			Values: make(map[string]string),
 		}
 		
-		// Map common priority names automatically
+		// Set default priority to middle option if available, otherwise first
+		middleIndex := len(priorityField.Options) / 2
+		if middleIndex < len(priorityField.Options) {
+			defaultPriority := priorityField.Options[middleIndex].Name
+			normalizedKey := strings.ToLower(strings.ReplaceAll(defaultPriority, " ", "_"))
+			cfg.Defaults.Priority = normalizedKey
+			priorityMapping.Values[normalizedKey] = defaultPriority
+		}
+		
+		// Map all priority options using their normalized names as keys
 		for _, opt := range priorityField.Options {
+			// Create normalized key from the actual option name
+			normalizedKey := strings.ToLower(strings.ReplaceAll(opt.Name, " ", "_"))
+			priorityMapping.Values[normalizedKey] = opt.Name
+			
+			// Also add common aliases for convenience
 			lowerOpt := strings.ToLower(opt.Name)
 			switch {
-			case strings.Contains(lowerOpt, "p0") || strings.Contains(lowerOpt, "critical") || strings.Contains(lowerOpt, "urgent"):
+			case strings.Contains(lowerOpt, "p0") && normalizedKey != "p0":
+				priorityMapping.Values["p0"] = opt.Name
+			case strings.Contains(lowerOpt, "critical") && normalizedKey != "critical":
 				priorityMapping.Values["critical"] = opt.Name
-			case strings.Contains(lowerOpt, "p1") || strings.Contains(lowerOpt, "high"):
+			case strings.Contains(lowerOpt, "urgent") && normalizedKey != "urgent":
+				priorityMapping.Values["urgent"] = opt.Name
+			case strings.Contains(lowerOpt, "p1") && normalizedKey != "p1":
+				priorityMapping.Values["p1"] = opt.Name
+			case strings.Contains(lowerOpt, "high") && normalizedKey != "high":
 				priorityMapping.Values["high"] = opt.Name
-			case strings.Contains(lowerOpt, "p2") || strings.Contains(lowerOpt, "medium") || strings.Contains(lowerOpt, "normal"):
+			case strings.Contains(lowerOpt, "p2") && normalizedKey != "p2":
+				priorityMapping.Values["p2"] = opt.Name
+			case strings.Contains(lowerOpt, "medium") && normalizedKey != "medium":
 				priorityMapping.Values["medium"] = opt.Name
-			case strings.Contains(lowerOpt, "p3") || strings.Contains(lowerOpt, "low"):
+			case strings.Contains(lowerOpt, "normal") && normalizedKey != "normal":
+				priorityMapping.Values["normal"] = opt.Name
+			case strings.Contains(lowerOpt, "p3") && normalizedKey != "p3":
+				priorityMapping.Values["p3"] = opt.Name
+			case strings.Contains(lowerOpt, "low") && normalizedKey != "low":
 				priorityMapping.Values["low"] = opt.Name
 			}
 		}
