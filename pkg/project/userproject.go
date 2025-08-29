@@ -169,3 +169,8 @@ func (c *Client) GetCurrentUsername() (string, error) {
 
 	return result.Viewer.Login, nil
 }
+
+// GetCurrentUser is an alias for GetCurrentUsername for compatibility
+func (c *Client) GetCurrentUser() (string, error) {
+	return c.GetCurrentUsername()
+}

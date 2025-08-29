@@ -56,9 +56,11 @@ func init() {
 
 func runInit(cmd *cobra.Command, args []string) error {
 	// Check if config already exists
+	var cfg *config.Config
+	
 	if config.Exists() {
 		fmt.Println("Configuration file .gh-pm.yml already exists in this directory or a parent directory.")
-		fmt.Print("Do you want to overwrite it? (y/N): ")
+		fmt.Print("Do you want to update it? (y/N): ")
 		
 		var response string
 		fmt.Scanln(&response)
@@ -66,10 +68,20 @@ func runInit(cmd *cobra.Command, args []string) error {
 			fmt.Println("Initialization cancelled.")
 			return nil
 		}
+		
+		// Load existing config
+		var err error
+		cfg, err = config.LoadConfig()
+		if err != nil {
+			fmt.Printf("Warning: Could not load existing config, creating new one: %v\n", err)
+			cfg = config.DefaultConfig()
+		} else {
+			fmt.Println("Updating existing configuration...")
+		}
+	} else {
+		// Create default config
+		cfg = config.DefaultConfig()
 	}
-
-	// Create default config
-	cfg := config.DefaultConfig()
 
 	// Try to detect from current repository first
 	org, repo, repoErr := getCurrentRepo()
@@ -203,7 +215,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// If project is specified, try to fetch project details
-	if cfg.Project.Name != "" && cfg.Project.Number == 0 {
+	// Always fetch to ensure we have the latest owner information
+	if cfg.Project.Name != "" || cfg.Project.Number > 0 {
 		fmt.Printf("Fetching project details from GitHub...\n")
 		
 		client, err := project.NewClient()
@@ -214,7 +227,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 			
 			// Try as organization project first if org is specified
 			if cfg.Project.Org != "" {
-				proj, err = client.GetProject(cfg.Project.Org, cfg.Project.Name, 0)
+				// Use project number if available, otherwise use name
+				if cfg.Project.Number > 0 {
+					proj, err = client.GetProject(cfg.Project.Org, "", cfg.Project.Number)
+				} else {
+					proj, err = client.GetProject(cfg.Project.Org, cfg.Project.Name, 0)
+				}
 			}
 			
 			// If failed or no org specified, try as user project
@@ -230,7 +248,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 				
 				// Try with owner as user
 				if owner != "" {
-					userProj, userErr := client.GetUserProject(owner, cfg.Project.Name, 0)
+					var userProj *project.Project
+					var userErr error
+					if cfg.Project.Number > 0 {
+						userProj, userErr = client.GetUserProject(owner, "", cfg.Project.Number)
+					} else {
+						userProj, userErr = client.GetUserProject(owner, cfg.Project.Name, 0)
+					}
 					if userErr == nil {
 						proj = userProj
 						err = nil
@@ -241,7 +265,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 				
 				// If still no project, try current user
 				if proj == nil {
-					userProj, userErr := client.GetCurrentUserProject(cfg.Project.Name, 0)
+					var userProj *project.Project
+					var userErr error
+					if cfg.Project.Number > 0 {
+						userProj, userErr = client.GetCurrentUserProject("", cfg.Project.Number)
+					} else {
+						userProj, userErr = client.GetCurrentUserProject(cfg.Project.Name, 0)
+					}
 					if userErr == nil {
 						proj = userProj
 						err = nil
@@ -254,6 +284,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 				fmt.Printf("Warning: Could not fetch project details: %v\n", err)
 			} else {
 				cfg.Project.Number = proj.Number
+				// Store the project owner for URL generation
+				if proj.Owner.Login != "" {
+					cfg.Project.Owner = proj.Owner.Login
+					fmt.Printf("✓ Updated project owner: %s\n", proj.Owner.Login)
+				}
 				fmt.Printf("✓ Found project: %s (#%d)\n", proj.Title, proj.Number)
 				
 				// Fetch and display available fields

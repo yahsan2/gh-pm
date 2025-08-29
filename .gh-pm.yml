@@ -1,7 +1,7 @@
 project:
     name: gh-pm project
     number: 8
-    org: yahsan2
+    owner: yahsan2
 repositories:
     - yahsan2/gh-pm
 defaults:

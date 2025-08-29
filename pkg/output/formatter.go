@@ -52,7 +52,12 @@ func NewFormatterWithWriter(format FormatType, writer io.Writer) *Formatter {
 func (f *Formatter) FormatIssue(issue *issue.Issue) error {
 	switch f.format {
 	case FormatQuiet:
-		_, err := fmt.Fprintln(f.writer, issue.URL)
+		// Output the project URL if available, otherwise the issue URL
+		urlToShow := issue.URL
+		if issue.ProjectURL != "" {
+			urlToShow = issue.ProjectURL
+		}
+		_, err := fmt.Fprintln(f.writer, urlToShow)
 		return err
 	case FormatJSON:
 		return f.formatIssueJSON(issue)
@@ -72,6 +77,9 @@ func (f *Formatter) formatIssueTable(issue *issue.Issue) error {
 	fmt.Fprintf(w, "Number:\t#%d\n", issue.Number)
 	fmt.Fprintf(w, "Title:\t%s\n", issue.Title)
 	fmt.Fprintf(w, "URL:\t%s\n", issue.URL)
+	if issue.ProjectURL != "" {
+		fmt.Fprintf(w, "Project URL:\t%s\n", issue.ProjectURL)
+	}
 	fmt.Fprintf(w, "Repository:\t%s\n", issue.Repository)
 	fmt.Fprintf(w, "State:\t%s\n", issue.State)
 	

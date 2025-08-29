@@ -190,6 +190,7 @@ func (c *CreateCommand) Execute(title string) error {
 	}
 	
 	// Add to project if configured
+	var projectURL string
 	if c.config.Project.Name != "" || c.config.Project.Number > 0 {
 		projectID := c.config.GetProjectID()
 		if projectID == "" {
@@ -219,9 +220,31 @@ func (c *CreateCommand) Execute(title string) error {
 		}
 		
 		// Add issue to project
-		itemID, err := c.issueAPI.AddToProject(createdIssue.ID, projectID)
+		itemID, databaseID, err := c.issueAPI.AddToProjectWithDatabaseID(createdIssue.ID, projectID)
 		if err != nil {
 			return fmt.Errorf("failed to add issue to project: %w", err)
+		}
+		
+		// Build the project URL with the numeric database ID
+		if c.config.Project.Org != "" {
+			// For organization projects, use /orgs/ path
+			projectURL = fmt.Sprintf("https://github.com/orgs/%s/projects/%d/views/1?pane=issue&itemId=%d",
+				c.config.Project.Org, c.config.Project.Number, databaseID)
+		} else {
+			// For user projects, use /users/ path
+			// First try to use the stored owner from config
+			owner := c.config.Project.Owner
+			if owner == "" {
+				// Fallback to getting current user if owner not in config
+				user, err := c.client.GetCurrentUser()
+				if err == nil && user != "" {
+					owner = user
+				}
+			}
+			if owner != "" {
+				projectURL = fmt.Sprintf("https://github.com/users/%s/projects/%d/views/1?pane=issue&itemId=%d",
+					owner, c.config.Project.Number, databaseID)
+			}
 		}
 		
 		// Get project fields to map field names to IDs
@@ -245,6 +268,11 @@ func (c *CreateCommand) Execute(title string) error {
 				fmt.Printf("Warning: failed to update priority field: %v\n", err)
 			}
 		}
+	}
+	
+	// Add project URL to issue if available
+	if projectURL != "" {
+		createdIssue.ProjectURL = projectURL
 	}
 	
 	// Format and display output

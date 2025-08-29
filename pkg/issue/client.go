@@ -44,6 +44,7 @@ func (c *Client) AddToProject(issueID, projectID string) (string, error) {
 			addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
 				item {
 					id
+					databaseId
 				}
 			}
 		}`
@@ -56,7 +57,8 @@ func (c *Client) AddToProject(issueID, projectID string) (string, error) {
 	var result struct {
 		AddProjectV2ItemById struct {
 			Item struct {
-				ID string `json:"id"`
+				ID         string `json:"id"`
+				DatabaseID int    `json:"databaseId"`
 			} `json:"item"`
 		} `json:"addProjectV2ItemById"`
 	}
@@ -67,6 +69,41 @@ func (c *Client) AddToProject(issueID, projectID string) (string, error) {
 	}
 	
 	return result.AddProjectV2ItemById.Item.ID, nil
+}
+
+// AddToProjectWithDatabaseID adds an issue to a project and returns both IDs
+func (c *Client) AddToProjectWithDatabaseID(issueID, projectID string) (string, int, error) {
+	// Add issue to project using GraphQL
+	mutation := `
+		mutation($projectId: ID!, $contentId: ID!) {
+			addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+				item {
+					id
+					databaseId
+				}
+			}
+		}`
+	
+	variables := map[string]interface{}{
+		"projectId": projectID,
+		"contentId": issueID,
+	}
+	
+	var result struct {
+		AddProjectV2ItemById struct {
+			Item struct {
+				ID         string `json:"id"`
+				DatabaseID int    `json:"databaseId"`
+			} `json:"item"`
+		} `json:"addProjectV2ItemById"`
+	}
+	
+	err := c.gql.Do(mutation, variables, &result)
+	if err != nil {
+		return "", 0, NewAPIError("failed to add issue to project", err)
+	}
+	
+	return result.AddProjectV2ItemById.Item.ID, result.AddProjectV2ItemById.Item.DatabaseID, nil
 }
 
 // UpdateProjectItemField updates a single field value for a project item

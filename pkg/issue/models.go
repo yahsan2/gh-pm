@@ -31,6 +31,7 @@ type Issue struct {
 	Repository  string       `json:"repository"`
 	Labels      []Label      `json:"labels"`
 	ProjectItem *ProjectItem `json:"project_item,omitempty"`
+	ProjectURL  string       `json:"project_url,omitempty"`
 	CreatedAt   time.Time    `json:"created_at"`
 	UpdatedAt   time.Time    `json:"updated_at"`
 }

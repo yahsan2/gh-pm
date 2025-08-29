@@ -25,6 +25,7 @@ type ProjectConfig struct {
 	Name   string `yaml:"name"`
 	Number int    `yaml:"number,omitempty"`
 	Org    string `yaml:"org,omitempty"`
+	Owner  string `yaml:"owner,omitempty"` // Project owner username (for URL generation)
 }
 
 // DefaultsConfig represents default values
