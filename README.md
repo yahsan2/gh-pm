@@ -1,0 +1,455 @@
+# gh-pm
+
+A GitHub CLI extension for project management with GitHub Projects (v2) and Issues. Streamline requirements definition, prioritization, task decomposition, and progress tracking from the command line.
+
+## Features
+
+- 📊 **Project Management** - Manage GitHub Projects v2 directly from CLI
+- 🔄 **Issue Workflow** - Create, update, and track issues with rich metadata
+- 🏗️ **Task Decomposition** - Break down issues into manageable sub-tasks
+- 🎯 **Priority Management** - Set and track priorities across issues
+- 📈 **Progress Tracking** - Monitor task completion and project status
+- 🔗 **Cross-repository Support** - Manage issues across multiple repositories
+- 🎨 Multiple output formats (TTY, table, JSON, CSV)
+
+## Installation
+
+```bash
+gh extension install yahsan2/gh-pm
+```
+
+### Update
+```bash
+gh extension upgrade pm
+```
+
+### Requirements
+- GitHub CLI 2.0.0 or later
+- GitHub account with repository and project permissions
+- Access to GitHub Projects (v2)
+
+## Quick Start
+
+### Initialize Configuration
+```bash
+# Create .gh-pm.yml configuration file
+gh pm init
+
+# Specify project and repositories
+gh pm init --project "My Project" --repo owner/repo1,owner/repo2
+```
+
+### Basic Workflow
+```bash
+# List all issues in project
+gh pm list
+
+# Create a new issue with priority
+gh pm create --title "Implement authentication" --priority high --label "backend"
+
+# Update issue status
+gh pm update 123 --status "In Progress"
+
+# Add sub-task to an issue
+gh pm add-task 123 --title "Design database schema"
+
+# Track progress
+gh pm status
+```
+
+## Core Commands
+
+### Project Management
+
+#### List Issues
+```bash
+# List all issues in current project
+gh pm list
+
+# Filter by status
+gh pm list --status "In Progress"
+
+# Filter by priority
+gh pm list --priority high,critical
+
+# JSON output
+gh pm list --json number,title,priority,status
+```
+
+#### Create Issue
+```bash
+# Basic creation
+gh pm create --title "Add user dashboard"
+
+# With full details
+gh pm create \
+  --title "Implement REST API" \
+  --body "Create RESTful endpoints for user management" \
+  --priority high \
+  --assignee "@me" \
+  --label "api,backend" \
+  --milestone "v1.0"
+```
+
+#### Update Issue
+```bash
+# Update single field
+gh pm update 123 --status "In Review"
+
+# Update multiple fields
+gh pm update 123 \
+  --priority critical \
+  --assignee "johndoe" \
+  --add-label "urgent"
+```
+
+### Task Decomposition
+
+#### Add Sub-tasks
+```bash
+# Add a single task
+gh pm add-task 123 --title "Write unit tests"
+
+# Add multiple tasks from file
+gh pm add-tasks 123 --file tasks.md
+
+# Interactive task creation
+gh pm add-task 123 --interactive
+```
+
+#### List Tasks
+```bash
+# List all sub-tasks
+gh pm tasks 123
+
+# Show completed tasks only
+gh pm tasks 123 --completed
+
+# Tree view
+gh pm tasks 123 --tree
+```
+
+#### Complete Tasks
+```bash
+# Mark task as complete
+gh pm complete-task 123 456
+
+# Bulk complete
+gh pm complete-tasks 123 --ids 456,457,458
+```
+
+### Priority Management
+
+#### Set Priority
+```bash
+# Set single issue priority
+gh pm set-priority 123 high
+
+# Bulk priority update
+gh pm set-priority 123,124,125 --level critical
+```
+
+#### Priority Matrix
+```bash
+# View priority matrix
+gh pm priority-matrix
+
+# Export as CSV
+gh pm priority-matrix --output csv > priorities.csv
+```
+
+### Progress Tracking
+
+#### Project Status
+```bash
+# Overall project status
+gh pm status
+
+# Detailed progress report
+gh pm status --detailed
+
+# Specific milestone
+gh pm status --milestone "v1.0"
+```
+
+#### Burndown
+```bash
+# Sprint burndown (when sprint support is added)
+gh pm burndown
+
+# Custom date range
+gh pm burndown --from 2024-01-01 --to 2024-01-31
+```
+
+## Configuration
+
+### Project Configuration (.gh-pm.yml)
+
+```yaml
+# Project settings
+project:
+  name: "My Project"
+  number: 1  # or project ID
+  org: "my-organization"  # optional
+
+# Repository settings
+repositories:
+  - owner/repo1
+  - owner/repo2
+
+# Default values
+defaults:
+  priority: medium
+  status: "Todo"
+  labels:
+    - "pm-tracked"
+
+# Custom fields mapping
+fields:
+  priority:
+    field: "Priority"
+    values:
+      low: "Low"
+      medium: "Medium"
+      high: "High"
+      critical: "Critical"
+  
+  status:
+    field: "Status"
+    values:
+      todo: "Todo"
+      in_progress: "In Progress"
+      in_review: "In Review"
+      done: "Done"
+
+# Output preferences
+output:
+  format: table  # table, json, csv
+  color: true
+  timezone: "UTC"
+```
+
+### Global Configuration
+
+```bash
+# Set default project
+gh pm config set default-project "My Project"
+
+# Set default output format
+gh pm config set output-format json
+
+# View all settings
+gh pm config list
+```
+
+## Advanced Usage
+
+### Cross-Repository Operations
+
+```bash
+# Create issue in specific repo
+gh pm create --repo owner/other-repo --title "Cross-repo task"
+
+# List issues from multiple repos
+gh pm list --repo owner/repo1,owner/repo2
+
+# Move issue between repos
+gh pm move 123 --to owner/other-repo
+```
+
+### Bulk Operations
+
+```bash
+# Bulk update from CSV
+gh pm bulk-update --file updates.csv
+
+# Export issues to CSV
+gh pm export --format csv --output issues.csv
+
+# Import issues from JSON
+gh pm import --file issues.json
+```
+
+### Templates
+
+```bash
+# Create issue from template
+gh pm create --template bug-report
+
+# List available templates
+gh pm templates list
+
+# Create custom template
+gh pm templates create --name "feature-request"
+```
+
+### Automation
+
+```bash
+# Watch for status changes
+gh pm watch --interval 30s
+
+# Run webhook on changes
+gh pm watch --webhook https://example.com/hook
+
+# Generate daily report
+gh pm report daily --email team@example.com
+```
+
+## Output Formats
+
+### Table (Default)
+```
+┌─────┬──────────────────────┬──────────┬────────────┬──────────┐
+│ #   │ Title                │ Priority │ Status     │ Assignee │
+├─────┼──────────────────────┼──────────┼────────────┼──────────┤
+│ 123 │ Implement auth       │ High     │ In Progress│ @johndoe │
+│ 124 │ Add user dashboard   │ Medium   │ Todo       │ @janedoe │
+└─────┴──────────────────────┴──────────┴────────────┴──────────┘
+```
+
+### JSON
+```json
+{
+  "issues": [
+    {
+      "number": 123,
+      "title": "Implement auth",
+      "priority": "high",
+      "status": "in_progress",
+      "assignee": "johndoe"
+    }
+  ]
+}
+```
+
+### CSV
+```csv
+number,title,priority,status,assignee
+123,"Implement auth",high,in_progress,johndoe
+124,"Add user dashboard",medium,todo,janedoe
+```
+
+## Integration
+
+### GitHub Actions
+
+```yaml
+name: Project Management
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  update-project:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Update project
+        run: |
+          gh pm update ${{ github.event.issue.number }} \
+            --status "Todo" \
+            --priority medium
+```
+
+### Git Hooks
+
+```bash
+# .git/hooks/post-commit
+#!/bin/bash
+# Auto-update issue status on commit
+if [[ $(git log -1 --pretty=%B) =~ "#([0-9]+)" ]]; then
+  gh pm update "${BASH_REMATCH[1]}" --status "In Review"
+fi
+```
+
+## Troubleshooting
+
+### Authentication Issues
+```bash
+# Check authentication
+gh auth status
+
+# Re-authenticate
+gh auth login
+
+# Use specific token
+export GH_TOKEN=your_token_here
+```
+
+### Project Access
+```bash
+# List accessible projects
+gh pm projects list
+
+# Check permissions
+gh pm debug permissions
+```
+
+### Performance
+```bash
+# Enable caching
+gh pm config set cache true
+
+# Clear cache
+gh pm cache clear
+
+# Verbose output for debugging
+gh pm list --verbose
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Setup
+
+```bash
+# Clone repository
+git clone https://github.com/yahsan2/gh-pm.git
+cd gh-pm
+
+# Install dependencies
+npm install  # or appropriate package manager
+
+# Run tests
+npm test
+
+# Build
+npm run build
+```
+
+## Roadmap
+
+- [ ] Sprint management (`gh pm sprint ...`)
+- [ ] Gantt chart visualization
+- [ ] Time tracking integration
+- [ ] Custom workflow automation
+- [ ] AI-powered task suggestions
+- [ ] Mobile companion app
+- [ ] Slack/Discord integration
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details
+
+## Acknowledgments
+
+- Built on [GitHub CLI](https://cli.github.com/)
+- Inspired by modern project management best practices
+- Thanks to all contributors and users
+
+## Support
+
+- 🐛 [Report bugs](https://github.com/yahsan2/gh-pm/issues)
+- 💡 [Request features](https://github.com/yahsan2/gh-pm/discussions)
+- 📖 [Read documentation](https://github.com/yahsan2/gh-pm/wiki)
+- 💬 [Join discussions](https://github.com/yahsan2/gh-pm/discussions)
+
+---
+
+Made with ❤️ for GitHub project managers
