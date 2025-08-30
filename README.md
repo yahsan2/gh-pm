@@ -39,9 +39,6 @@ The `init` command creates a `.gh-pm.yml` configuration file with automatic proj
 # Interactive initialization (auto-detects current repository and lists available projects)
 gh pm init
 
-# Select from all available projects
-gh pm init --list
-
 # Specify project and repositories
 gh pm init --project "My Project" --repo owner/repo1,owner/repo2
 
@@ -89,7 +86,6 @@ Initialize a new configuration file with automatic project detection and field m
 - `--project <name>` - Specify project name or number
 - `--org <name>` - Organization name (for org projects)
 - `--repo <owner/repo>` - Repository (can be specified multiple times)
-- `--list` - List all available projects to choose from
 - `--skip-metadata` - Skip fetching project metadata (creates simpler config)
 - `--interactive` - Interactive mode (default: true)
 

@@ -39,7 +39,6 @@ var (
 	initOrg          string
 	initRepos        []string
 	initInteractive  bool
-	initListProjects bool
 	skipMetadata     bool
 )
 
@@ -50,7 +49,6 @@ func init() {
 	initCmd.Flags().StringVar(&initOrg, "org", "", "Organization name")
 	initCmd.Flags().StringSliceVar(&initRepos, "repo", []string{}, "Repositories (owner/repo format)")
 	initCmd.Flags().BoolVarP(&initInteractive, "interactive", "i", true, "Interactive mode")
-	initCmd.Flags().BoolVarP(&initListProjects, "list", "l", false, "List all available projects to choose from")
 	initCmd.Flags().BoolVar(&skipMetadata, "skip-metadata", false, "Skip fetching project metadata (IDs for fields and options)")
 }
 
@@ -101,36 +99,26 @@ func runInit(cmd *cobra.Command, args []string) error {
 			cfg.Repositories = initRepos
 		}
 
-		// Try to auto-detect projects from current repository or show all projects
-		if initProject == "" && (initInteractive || initListProjects) {
+		// Try to auto-detect projects from current repository
+		if initProject == "" && initInteractive {
 			client, err := project.NewClient()
 			if err == nil {
 				var projectsToShow []project.Project
 				var sourceDescription string
 
-				if initListProjects {
-					// User explicitly wants to see all projects
-					fmt.Printf("Fetching all projects from organization %s...\n", cfg.Project.Org)
+				// Try repository projects first
+				fmt.Printf("Detecting projects for repository %s/%s...\n", org, repo)
+				repoProjects, err := client.GetRepoProjects(org, repo)
+				if err == nil && len(repoProjects) > 0 {
+					projectsToShow = repoProjects
+					sourceDescription = fmt.Sprintf("repository %s/%s", org, repo)
+				} else if err == nil && len(repoProjects) == 0 {
+					// No projects in repo, try org projects
+					fmt.Printf("No projects found in repository. Checking organization projects...\n")
 					orgProjects, err := client.ListProjects(cfg.Project.Org)
 					if err == nil {
 						projectsToShow = orgProjects
 						sourceDescription = fmt.Sprintf("organization %s", cfg.Project.Org)
-					}
-				} else {
-					// Try repository projects first
-					fmt.Printf("Detecting projects for repository %s/%s...\n", org, repo)
-					repoProjects, err := client.GetRepoProjects(org, repo)
-					if err == nil && len(repoProjects) > 0 {
-						projectsToShow = repoProjects
-						sourceDescription = fmt.Sprintf("repository %s/%s", org, repo)
-					} else if err == nil && len(repoProjects) == 0 {
-						// No projects in repo, try org projects
-						fmt.Printf("No projects found in repository. Checking organization projects...\n")
-						orgProjects, err := client.ListProjects(cfg.Project.Org)
-						if err == nil {
-							projectsToShow = orgProjects
-							sourceDescription = fmt.Sprintf("organization %s", cfg.Project.Org)
-						}
 					}
 				}
 
