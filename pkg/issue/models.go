@@ -31,11 +31,22 @@ type Issue struct {
 	State       string       `json:"state"`
 	Repository  string       `json:"repository"`
 	Labels      []Label      `json:"labels"`
+	Assignees   []string     `json:"assignees,omitempty"`
+	Milestone   string       `json:"milestone,omitempty"`
 	ProjectItem *ProjectItem `json:"project_item,omitempty"`
 	ProjectURL  string       `json:"project_url,omitempty"`
 	Comments    []Comment    `json:"comments,omitempty"`
 	CreatedAt   time.Time    `json:"created_at"`
 	UpdatedAt   time.Time    `json:"updated_at"`
+}
+
+// IssueRequest represents the data for creating/updating an issue
+type IssueRequest struct {
+	Title     string   `json:"title"`
+	Body      string   `json:"body"`
+	Labels    []string `json:"labels"`
+	Assignees []string `json:"assignees"`
+	Milestone string   `json:"milestone"`
 }
 
 // Label represents a GitHub issue label

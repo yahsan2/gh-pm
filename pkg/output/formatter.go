@@ -48,6 +48,29 @@ func NewFormatterWithWriter(format FormatType, writer io.Writer) *Formatter {
 	}
 }
 
+// Format formats arbitrary data as JSON
+func (f *Formatter) Format(data interface{}) error {
+	switch f.format {
+	case FormatJSON:
+		encoder := json.NewEncoder(f.writer)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(data)
+	case FormatQuiet:
+		// For quiet mode, just print minimal info
+		if summary, ok := data.(map[string]interface{}); ok {
+			if count, ok := summary["created_count"].(int); ok {
+				fmt.Fprintf(f.writer, "Created %d sub-issues\n", count)
+			}
+		}
+		return nil
+	default:
+		// Default to JSON for arbitrary data
+		encoder := json.NewEncoder(f.writer)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(data)
+	}
+}
+
 // FormatIssue formats a single issue for output
 func (f *Formatter) FormatIssue(issue *issue.Issue) error {
 	switch f.format {

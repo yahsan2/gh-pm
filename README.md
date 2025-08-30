@@ -10,6 +10,7 @@ A GitHub CLI extension for project management with GitHub Projects (v2) and Issu
 - 🎯 **Priority Management** - Set and track priorities across issues
 - 🔗 **Project Board Integration** - Direct links to GitHub Projects board views
 - 📈 **Progress Tracking** - Monitor task completion and project status
+- ➗ **Issue Splitting** - Decompose issues into sub-issues using GitHub's native hierarchy
 - 🚀 **Dry-run Mode** - Preview changes before applying them
 - 🎨 **Multiple output formats** - Table, JSON, CSV, and quiet modes
 
@@ -28,6 +29,7 @@ gh extension upgrade pm
 - GitHub CLI 2.0.0 or later
 - GitHub account with repository and project permissions
 - Access to GitHub Projects (v2)
+- `gh-sub-issue` extension for split command: `gh extension install yahsan2/gh-sub-issue`
 
 ## Quick Start
 
@@ -66,6 +68,9 @@ gh pm view 123
 
 # Move issue to In Progress status
 gh pm move 123 --status in_progress
+
+# Split issue into sub-issues
+gh pm split 123 --from=body
 
 # Run triage to bulk update issues
 gh pm triage tracked
@@ -204,6 +209,87 @@ The exact field values depend on your project configuration (`.gh-pm.yml`):
 - The issue must already be added to the configured project
 - Field values are case-sensitive and must match your project configuration
 - Use `gh pm init` to see available values for your project
+
+### Issue Splitting (Task Decomposition)
+
+#### Split Command
+
+Decompose parent issues into sub-issues using GitHub's native issue hierarchy feature. This command automatically creates linked sub-issues from task lists, maintaining parent-child relationships for better project organization.
+
+**Requirements:**
+- Requires `gh-sub-issue` extension: `gh extension install yahsan2/gh-sub-issue`
+- The command will prompt for installation if the extension is not found
+
+```bash
+# Split from issue body checklist
+gh pm split 123 --from=body
+
+# Split from a file containing tasks
+gh pm split 123 --from=./tasks.md
+
+# Split from stdin
+cat tasks.md | gh pm split 123
+
+# Split from JSON array
+gh pm split 123 '["Task 1", "Task 2", "Task 3"]'
+
+# Split from command arguments
+gh pm split 123 "Design API" "Implement backend" "Write tests"
+
+# Specify repository explicitly
+gh pm split 123 --from=body --repo owner/repo
+```
+
+**Features:**
+- 🔍 **Duplicate Detection** - Automatically checks existing sub-issues to avoid duplicates
+- 🏷️ **Label Inheritance** - Sub-issues inherit labels from the parent (except meta labels)
+- 👥 **Assignee Inheritance** - Sub-issues inherit assignees from the parent
+- 🎯 **Milestone Inheritance** - Sub-issues inherit milestone from the parent
+- 🔗 **Native GitHub Integration** - Uses GitHub's built-in sub-issue hierarchy
+- ✅ **Checklist Support** - Recognizes GitHub-style checkboxes (`- [ ]` format)
+
+**Input Formats:**
+
+1. **Issue Body** (`--from=body`): Extracts checklist items from the parent issue's description
+   ```markdown
+   - [ ] Design database schema
+   - [ ] Implement API endpoints
+   - [ ] Write unit tests
+   ```
+
+2. **File Input** (`--from=./file.md`): Reads tasks from a markdown file with checklist format
+
+3. **JSON Array**: Pass tasks as a JSON array
+   ```bash
+   gh pm split 123 '["Task 1", "Task 2", "Task 3"]'
+   ```
+
+4. **Command Arguments**: Pass tasks directly as arguments
+   ```bash
+   gh pm split 123 "First task" "Second task" "Third task"
+   ```
+
+5. **Stdin**: Pipe tasks from another command
+   ```bash
+   echo "- [ ] Task 1\n- [ ] Task 2" | gh pm split 123
+   ```
+
+**Example Output:**
+```
+Checking for existing sub-issues and creating new ones for issue #123...
+Found 2 existing sub-issues for issue #123
+⏭️  Skipping (already exists): Design database schema
+✓ Created sub-issue #124: Implement API endpoints
+✓ Created sub-issue #125: Write unit tests
+
+Skipped 1 task that already has sub-issues
+```
+
+**Notes:**
+- Sub-issues are automatically linked to the parent using GitHub's native hierarchy
+- The parent issue can be viewed with all sub-issues in GitHub's web interface
+- Duplicate detection prevents creating the same sub-issue multiple times
+- Sub-issues can be managed independently while maintaining their relationship to the parent
 
 ### View Issue Details
 
@@ -645,6 +731,7 @@ npm run build
 - [x] **Issue status & priority updates** (`gh pm move`)
 - [x] **Issue viewing** with project metadata and URLs (`gh pm view`)
 - [x] **Triage operations** for bulk issue processing (`gh pm triage`)
+- [x] **Issue splitting** into sub-issues with duplicate detection (`gh pm split`)
 - [x] **Configuration management** with field mapping
 - [x] **Multiple output formats** (table, JSON, CSV)
 - [x] **Project URL generation** for direct GitHub Projects board access
@@ -653,7 +740,6 @@ npm run build
 ### 🚧 In Development / Planned
 - [ ] Issue listing and filtering (`gh pm list`)
 - [ ] Bulk operations and CSV import/export
-- [ ] Task decomposition (`gh pm add-task`)
 - [ ] Progress tracking and reporting (`gh pm status`)
 - [ ] Sprint management features
 
