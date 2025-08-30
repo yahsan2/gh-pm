@@ -6,6 +6,7 @@ A GitHub CLI extension for project management with GitHub Projects (v2) and Issu
 
 - 📊 **Project Management** - Manage GitHub Projects v2 directly from CLI
 - 🔄 **Issue Workflow** - Create, update, view, and track issues with rich metadata
+- 📥 **Issue Intake** - Find and add issues not in project with gh issue list compatible interface
 - 🔍 **Issue Triage** - Bulk process issues with configurable rules and interactive mode
 - 🎯 **Priority Management** - Set and track priorities across issues
 - 🔗 **Project Board Integration** - Direct links to GitHub Projects board views
@@ -68,6 +69,9 @@ gh pm view 123
 
 # Move issue to In Progress status
 gh pm move 123 --status in_progress
+
+# Find and add issues not in project
+gh pm intake --label bug
 
 # Split issue into sub-issues
 gh pm split 123 --from=body
@@ -730,6 +734,7 @@ npm run build
 - [x] **Project initialization** with auto-detection (`gh pm init`)
 - [x] **Issue status & priority updates** (`gh pm move`)
 - [x] **Issue viewing** with project metadata and URLs (`gh pm view`)
+- [x] **Issue intake** with gh issue list compatible interface (`gh pm intake`)
 - [x] **Triage operations** for bulk issue processing (`gh pm triage`)
 - [x] **Issue splitting** into sub-issues with duplicate detection (`gh pm split`)
 - [x] **Configuration management** with field mapping
