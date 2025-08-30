@@ -351,3 +351,298 @@ fields:
 	assert.Equal(t, cfg.Project.Name, reloadedCfg.Project.Name)
 	assert.Nil(t, reloadedCfg.Metadata)
 }
+
+func TestValidate(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  *Config
+		wantErr bool
+		errMsg string
+	}{
+		{
+			name: "valid config with project name",
+			config: &Config{
+				Project: ProjectConfig{
+					Name: "My Project",
+				},
+				Repositories: []string{"owner/repo"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid config with project number",
+			config: &Config{
+				Project: ProjectConfig{
+					Number: 1,
+				},
+				Repositories: []string{"owner/repo"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "missing project name and number",
+			config: &Config{
+				Repositories: []string{"owner/repo"},
+			},
+			wantErr: true,
+			errMsg:  "project name or number is required",
+		},
+		{
+			name: "missing repositories",
+			config: &Config{
+				Project: ProjectConfig{
+					Name: "My Project",
+				},
+			},
+			wantErr: true,
+			errMsg:  "at least one repository must be configured",
+		},
+		{
+			name: "invalid repository format",
+			config: &Config{
+				Project: ProjectConfig{
+					Name: "My Project",
+				},
+				Repositories: []string{"invalid-repo"},
+			},
+			wantErr: true,
+			errMsg:  "invalid repository format",
+		},
+		{
+			name: "field without field name",
+			config: &Config{
+				Project: ProjectConfig{
+					Name: "My Project",
+				},
+				Repositories: []string{"owner/repo"},
+				Fields: map[string]Field{
+					"priority": {
+						Field:  "",
+						Values: map[string]string{"high": "HIGH"},
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "field name is required",
+		},
+		{
+			name: "field without values",
+			config: &Config{
+				Project: ProjectConfig{
+					Name: "My Project",
+				},
+				Repositories: []string{"owner/repo"},
+				Fields: map[string]Field{
+					"priority": {
+						Field:  "Priority",
+						Values: map[string]string{},
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "at least one value mapping is required",
+		},
+		{
+			name: "invalid default priority",
+			config: &Config{
+				Project: ProjectConfig{
+					Name: "My Project",
+				},
+				Repositories: []string{"owner/repo"},
+				Fields: map[string]Field{
+					"priority": {
+						Field:  "Priority",
+						Values: map[string]string{"high": "HIGH"},
+					},
+				},
+				Defaults: DefaultsConfig{
+					Priority: "medium",
+				},
+			},
+			wantErr: true,
+			errMsg:  "default priority 'medium' is not defined",
+		},
+		{
+			name: "invalid default status",
+			config: &Config{
+				Project: ProjectConfig{
+					Name: "My Project",
+				},
+				Repositories: []string{"owner/repo"},
+				Fields: map[string]Field{
+					"status": {
+						Field:  "Status",
+						Values: map[string]string{"todo": "Todo"},
+					},
+				},
+				Defaults: DefaultsConfig{
+					Status: "done",
+				},
+			},
+			wantErr: true,
+			errMsg:  "default status 'done' is not defined",
+		},
+		{
+			name: "valid config with all fields",
+			config: &Config{
+				Project: ProjectConfig{
+					Name:   "My Project",
+					Number: 1,
+				},
+				Repositories: []string{"owner/repo", "owner2/repo2"},
+				Fields: map[string]Field{
+					"priority": {
+						Field:  "Priority",
+						Values: map[string]string{"high": "HIGH", "medium": "MEDIUM"},
+					},
+					"status": {
+						Field:  "Status",
+						Values: map[string]string{"todo": "Todo", "done": "Done"},
+					},
+				},
+				Defaults: DefaultsConfig{
+					Priority: "medium",
+					Status:   "todo",
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("Validate() error = nil, wantErr %v", tt.wantErr)
+				} else if tt.errMsg != "" && !contains(err.Error(), tt.errMsg) {
+					t.Errorf("Validate() error = %v, want error containing %v", err, tt.errMsg)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			}
+		})
+	}
+}
+
+func TestLoadConfig(t *testing.T) {
+	tests := []struct {
+		name       string
+		setupFunc  func() func()
+		wantErr    bool
+		wantConfig *Config
+	}{
+		{
+			name: "load valid config",
+			setupFunc: func() func() {
+				tmpDir, _ := os.MkdirTemp("", "test")
+				configFile := filepath.Join(tmpDir, ConfigFileName)
+				
+				config := &Config{
+					Project: ProjectConfig{
+						Name:   "Test Project",
+						Number: 123,
+					},
+					Repositories: []string{"test/repo"},
+					Defaults: DefaultsConfig{
+						Labels: []string{"bug", "enhancement"},
+					},
+				}
+				
+				data, _ := yaml.Marshal(config)
+				os.WriteFile(configFile, data, 0644)
+				
+				origDir, _ := os.Getwd()
+				os.Chdir(tmpDir)
+				
+				return func() {
+					os.Chdir(origDir)
+					os.RemoveAll(tmpDir)
+				}
+			},
+			wantErr: false,
+			wantConfig: &Config{
+				Project: ProjectConfig{
+					Name:   "Test Project",
+					Number: 123,
+				},
+				Repositories: []string{"test/repo"},
+				Defaults: DefaultsConfig{
+					Labels: []string{"bug", "enhancement"},
+				},
+			},
+		},
+		{
+			name: "config file not found",
+			setupFunc: func() func() {
+				tmpDir, _ := os.MkdirTemp("", "test")
+				origDir, _ := os.Getwd()
+				os.Chdir(tmpDir)
+				
+				return func() {
+					os.Chdir(origDir)
+					os.RemoveAll(tmpDir)
+				}
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid yaml format",
+			setupFunc: func() func() {
+				tmpDir, _ := os.MkdirTemp("", "test")
+				configFile := filepath.Join(tmpDir, ConfigFileName)
+				
+				os.WriteFile(configFile, []byte("invalid: yaml: content:"), 0644)
+				
+				origDir, _ := os.Getwd()
+				os.Chdir(tmpDir)
+				
+				return func() {
+					os.Chdir(origDir)
+					os.RemoveAll(tmpDir)
+				}
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cleanup := tt.setupFunc()
+			defer cleanup()
+
+			got, err := LoadConfig()
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("LoadConfig() error = nil, wantErr %v", tt.wantErr)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("LoadConfig() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				if tt.wantConfig != nil {
+					if got.Project.Name != tt.wantConfig.Project.Name ||
+						got.Project.Number != tt.wantConfig.Project.Number ||
+						len(got.Repositories) != len(tt.wantConfig.Repositories) {
+						t.Errorf("LoadConfig() = %v, want %v", got, tt.wantConfig)
+					}
+				}
+			}
+		})
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) > 0 && len(substr) > 0 && s != substr && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || len(s) > len(substr) && containsMiddle(s, substr)))
+}
+
+func containsMiddle(s, substr string) bool {
+	for i := 1; i < len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
