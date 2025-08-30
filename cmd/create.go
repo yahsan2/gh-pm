@@ -335,6 +335,8 @@ func (c *CreateCommand) Execute(title string) error {
 				return fmt.Errorf("failed to get project: %w", err)
 			}
 			projectID = proj.ID
+			// Cache the project ID for future use
+			c.config.SetProjectID(projectID)
 		}
 		
 		// Add issue to project
@@ -346,10 +348,35 @@ func (c *CreateCommand) Execute(title string) error {
 		// Build the project URL with the numeric database ID
 		projectURL = c.urlBuilder.GetProjectItemURL(databaseID)
 		
-		// Get project fields to map field names to IDs
-		fields, err := c.client.GetFieldsWithOptions(projectID)
-		if err != nil {
-			return fmt.Errorf("failed to get project fields: %w", err)
+		// Try to use cached fields first
+		var fields []project.Field
+		if c.config.HasCachedFields() {
+			// Convert cached fields to project.Field format
+			cachedFields := c.config.GetAllFields()
+			fields = make([]project.Field, 0, len(cachedFields))
+			for _, cf := range cachedFields {
+				field := project.Field{
+					ID:       cf.ID,
+					Name:     cf.Name,
+					DataType: cf.DataType,
+				}
+				if cf.Options != nil {
+					field.Options = make([]project.FieldOption, 0, len(cf.Options))
+					for _, opt := range cf.Options {
+						field.Options = append(field.Options, project.FieldOption{
+							ID:   opt.ID,
+							Name: opt.Name,
+						})
+					}
+				}
+				fields = append(fields, field)
+			}
+		} else {
+			// Fallback to API call if no cache
+			fields, err = c.client.GetFieldsWithOptions(projectID)
+			if err != nil {
+				return fmt.Errorf("failed to get project fields: %w", err)
+			}
 		}
 		
 		// Update Status field if configured

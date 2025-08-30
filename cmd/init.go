@@ -317,12 +317,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 					// Always build and cache metadata (including all fields)
 					if !skipMetadata {
 						metadataManager := initpkg.NewMetadataManager(client)
-						metadata, fieldMappings, err := metadataManager.BuildMetadata(proj, fields)
+						metadata, err := metadataManager.BuildMetadata(proj, fields)
 						if err != nil {
 							fmt.Printf("Warning: Could not build metadata: %v\n", err)
 						} else {
 							cfg.Metadata = metadata
-							cfg.FieldMappings = fieldMappings
 							fmt.Printf("✓ Cached metadata for %d fields\n", len(fields))
 						}
 					}
@@ -592,12 +591,11 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 	// Always build and cache metadata (including all fields)
 	if !skipMetadata {
 		metadataManager := initpkg.NewMetadataManager(client)
-		metadata, fieldMappings, err := metadataManager.BuildMetadata(proj, fields)
+		metadata, err := metadataManager.BuildMetadata(proj, fields)
 		if err != nil {
 			fmt.Printf("Warning: Could not build metadata: %v\n", err)
 		} else {
 			cfg.Metadata = metadata
-			cfg.FieldMappings = fieldMappings
 			fmt.Printf("✓ Project metadata captured with %d fields for faster operations\n", len(fields))
 		}
 	}

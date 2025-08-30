@@ -24,25 +24,13 @@ fields:
             in_progress: In progress
             in_review: In review
             ready: Ready
-
 triage:
     estimate:
-        query: is:issue is:open status:backlog -has:estimate
+        instruction: Estimate the effort required to complete the issue.
+        query: is:issue is:open -has:estimate
         apply: {}
         interactive:
             estimate: true
-    high-priority:
-        query: is:issue is:open priority:p0
-        apply: {}
-        interactive: {}
-    medium-priority:
-        query: is:issue is:open priority:p1
-        apply: {}
-        interactive: {}
-    backlog-p1:
-        query: is:issue is:open status:backlog priority:p1
-        apply: {}
-        interactive: {}
     tracked:
         query: is:issue is:open -label:pm-tracked
         apply:
@@ -57,18 +45,77 @@ metadata:
     project:
         id: PVT_kwHOAAlRwM4BBvYB
     fields:
-        status:
-            id: PVTSSF_lAHOAAlRwM4BBvYBzg0KEU0
-            options:
-                done: "98236657"
-                in_progress: 47fc9ee4
-                in_review: df73e18b
-                ready: 61e4505c
-                todo: f75ad846
-                backlog: f75ad846
-        priority:
-            id: PVTSSF_lAHOAAlRwM4BBvYBzg0KEX4
-            options:
-                p0: "79628723"
-                p1: 0a877460
-                p2: da944a9c
+        - name: Title
+          id: PVTF_lAHOAAlRwM4BBvYBzg0KEUs
+          data_type: TITLE
+        - name: Assignees
+          id: PVTF_lAHOAAlRwM4BBvYBzg0KEUw
+          data_type: ASSIGNEES
+        - name: Status
+          id: PVTSSF_lAHOAAlRwM4BBvYBzg0KEU0
+          data_type: SINGLE_SELECT
+          options:
+            - name: Backlog
+              id: f75ad846
+            - name: Ready
+              id: 61e4505c
+            - name: In progress
+              id: 47fc9ee4
+            - name: In review
+              id: df73e18b
+            - name: Done
+              id: "98236657"
+        - name: Labels
+          id: PVTF_lAHOAAlRwM4BBvYBzg0KEU4
+          data_type: LABELS
+        - name: Linked pull requests
+          id: PVTF_lAHOAAlRwM4BBvYBzg0KEU8
+          data_type: LINKED_PULL_REQUESTS
+        - name: Milestone
+          id: PVTF_lAHOAAlRwM4BBvYBzg0KEVA
+          data_type: MILESTONE
+        - name: Repository
+          id: PVTF_lAHOAAlRwM4BBvYBzg0KEVE
+          data_type: REPOSITORY
+        - name: Reviewers
+          id: PVTF_lAHOAAlRwM4BBvYBzg0KEVI
+          data_type: REVIEWERS
+        - name: Parent issue
+          id: PVTF_lAHOAAlRwM4BBvYBzg0KEVM
+          data_type: PARENT_ISSUE
+        - name: Sub-issues progress
+          id: PVTF_lAHOAAlRwM4BBvYBzg0KEVQ
+          data_type: SUB_ISSUES_PROGRESS
+        - name: Priority
+          id: PVTSSF_lAHOAAlRwM4BBvYBzg0KEX4
+          data_type: SINGLE_SELECT
+          options:
+            - name: P0
+              id: "79628723"
+            - name: P1
+              id: 0a877460
+            - name: P2
+              id: da944a9c
+        - name: Size
+          id: PVTSSF_lAHOAAlRwM4BBvYBzg0KEX8
+          data_type: SINGLE_SELECT
+          options:
+            - name: XS
+              id: 6c6483d2
+            - name: S
+              id: f784b110
+            - name: M
+              id: 7515a9f1
+            - name: L
+              id: 817d0097
+            - name: XL
+              id: db339eb2
+        - name: Estimate
+          id: PVTF_lAHOAAlRwM4BBvYBzg0KEYA
+          data_type: NUMBER
+        - name: Start date
+          id: PVTF_lAHOAAlRwM4BBvYBzg0KEYE
+          data_type: DATE
+        - name: End date
+          id: PVTF_lAHOAAlRwM4BBvYBzg0KEYI
+          data_type: DATE

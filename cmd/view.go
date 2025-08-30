@@ -210,6 +210,8 @@ func (c *ViewCommand) getProjectMetadata(issueDetails *issue.Issue) (*issue.Proj
 			return nil, err
 		}
 		projectID = proj.ID
+		// Cache the project ID for future use
+		c.config.SetProjectID(projectID)
 	}
 	
 	// Get project item for this issue

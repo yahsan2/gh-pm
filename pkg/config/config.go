@@ -18,7 +18,6 @@ type Config struct {
 	Defaults      DefaultsConfig            `yaml:"defaults"`
 	Fields        map[string]Field          `yaml:"fields"`
 	Triage        map[string]TriageConfig   `yaml:"triage,omitempty"`
-	FieldMappings FieldsMetadata            `yaml:"field_mappings,omitempty"` // Field value mappings for Status, Priority, etc.
 	Metadata      *ConfigMetadata           `yaml:"metadata,omitempty"`
 }
 
@@ -73,9 +72,6 @@ type ConfigMetadata struct {
 type ProjectMetadata struct {
 	ID string `yaml:"id"` // Node ID (e.g., "PVT_kwHOAAlRwM4A8arc")
 }
-
-// FieldsMetadata represents cached field metadata as a dynamic map
-type FieldsMetadata map[string]*FieldMetadata
 
 // FieldMetadata represents cached field IDs and options
 type FieldMetadata struct {
@@ -318,12 +314,29 @@ func (c *Config) SetProjectID(id string) {
 
 // GetFieldMetadata returns metadata for a specific field
 func (c *Config) GetFieldMetadata(fieldName string) *FieldMetadata {
-	if c.FieldMappings == nil {
+	if c.Metadata == nil || c.Metadata.Fields == nil {
 		return nil
 	}
 	
-	if fieldMeta, exists := c.FieldMappings[fieldName]; exists {
-		return fieldMeta
+	// Find the field in metadata
+	for _, field := range c.Metadata.Fields {
+		if field.Name == fieldName {
+			// Convert FieldInfo to FieldMetadata format
+			fieldMeta := &FieldMetadata{
+				ID:      field.ID,
+				Options: make(map[string]string),
+			}
+			
+			// Convert options array to map
+			for _, opt := range field.Options {
+				// Normalize option name to lowercase with underscores
+				key := strings.ToLower(opt.Name)
+				key = strings.ReplaceAll(key, " ", "_")
+				fieldMeta.Options[key] = opt.ID
+			}
+			
+			return fieldMeta
+		}
 	}
 	
 	return nil

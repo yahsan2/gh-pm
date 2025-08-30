@@ -151,6 +151,8 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 					return fmt.Errorf("failed to get project: %w", err)
 				}
 				projectID = proj.ID
+				// Cache the project ID for future use
+				c.config.SetProjectID(projectID)
 			}
 		}
 	}
@@ -158,9 +160,34 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 	// Get project fields if we need to update them or handle interactive features
 	var fields []project.Field
 	if projectID != "" && (len(triageConfig.Apply.Fields) > 0 || triageConfig.Interactive.Status) {
-		fields, err = c.client.GetFieldsWithOptions(projectID)
-		if err != nil {
-			return fmt.Errorf("failed to get project fields: %w", err)
+		// Try to use cached fields first
+		if c.config.HasCachedFields() {
+			// Convert cached fields to project.Field format
+			cachedFields := c.config.GetAllFields()
+			fields = make([]project.Field, 0, len(cachedFields))
+			for _, cf := range cachedFields {
+				field := project.Field{
+					ID:       cf.ID,
+					Name:     cf.Name,
+					DataType: cf.DataType,
+				}
+				if cf.Options != nil {
+					field.Options = make([]project.FieldOption, 0, len(cf.Options))
+					for _, opt := range cf.Options {
+						field.Options = append(field.Options, project.FieldOption{
+							ID:   opt.ID,
+							Name: opt.Name,
+						})
+					}
+				}
+				fields = append(fields, field)
+			}
+		} else {
+			// Fallback to API call if no cache
+			fields, err = c.client.GetFieldsWithOptions(projectID)
+			if err != nil {
+				return fmt.Errorf("failed to get project fields: %w", err)
+			}
 		}
 	}
 	
@@ -224,9 +251,9 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 	
 	// Get available field names from metadata
 	availableFields := make(map[string]bool)
-	if c.config.FieldMappings != nil {
-		for fieldName := range c.config.FieldMappings {
-			availableFields[fieldName] = true
+	if c.config.Metadata != nil && c.config.Metadata.Fields != nil {
+		for _, field := range c.config.Metadata.Fields {
+			availableFields[field.Name] = true
 		}
 	}
 	
@@ -577,11 +604,9 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 	
 	// Map field filters to option IDs using metadata dynamically
 	for fieldName, filterValue := range fieldFilters {
-		if c.config.FieldMappings != nil {
-			if fieldMeta, exists := c.config.FieldMappings[fieldName]; exists && fieldMeta != nil && filterValue != "" {
-				if optionID, ok := fieldMeta.Options[filterValue]; ok {
-					filterOptionIDs[fieldMeta.ID] = optionID
-				}
+		if fieldMeta := c.config.GetFieldMetadata(fieldName); fieldMeta != nil && filterValue != "" {
+			if optionID, ok := fieldMeta.Options[filterValue]; ok {
+				filterOptionIDs[fieldMeta.ID] = optionID
 			}
 		}
 	}

@@ -49,7 +49,8 @@ func (m *MetadataManager) FetchFieldMetadata(projectID string, fieldName string)
 			for _, opt := range field.Options {
 				// Map option names to their IDs
 				// Use lowercase keys for consistent mapping
-				key := normalizeOptionKey(opt.Name)
+				key := strings.ToLower(opt.Name)
+				key = strings.ReplaceAll(key, " ", "_")
 				options[key] = opt.ID
 			}
 			
@@ -64,10 +65,9 @@ func (m *MetadataManager) FetchFieldMetadata(projectID string, fieldName string)
 }
 
 // BuildMetadata builds complete metadata structure for a project
-// It returns both metadata and field mappings
-func (m *MetadataManager) BuildMetadata(proj *project.Project, fields []project.Field) (*config.ConfigMetadata, config.FieldsMetadata, error) {
+func (m *MetadataManager) BuildMetadata(proj *project.Project, fields []project.Field) (*config.ConfigMetadata, error) {
 	if proj == nil {
-		return nil, nil, fmt.Errorf("project is nil")
+		return nil, fmt.Errorf("project is nil")
 	}
 	
 	metadata := &config.ConfigMetadata{
@@ -77,7 +77,6 @@ func (m *MetadataManager) BuildMetadata(proj *project.Project, fields []project.
 		Fields: make([]config.FieldInfo, 0, len(fields)),
 	}
 	
-	fieldMappings := config.FieldsMetadata{}
 	
 	// Cache ALL fields information for future reference
 	for _, field := range fields {
@@ -98,55 +97,11 @@ func (m *MetadataManager) BuildMetadata(proj *project.Project, fields []project.
 				})
 			}
 			
-			// Build options mapping for backward compatibility
-			options := make(map[string]string)
-			for _, opt := range field.Options {
-				key := normalizeOptionKey(opt.Name)
-				options[key] = opt.ID
-			}
-			
-			fieldMeta := &config.FieldMetadata{
-				ID:      field.ID,
-				Options: options,
-			}
-			
-			// Store field metadata with field name as key
-			// Using the actual field name to support dynamic field names
-			fieldMappings[field.Name] = fieldMeta
 		}
 		
 		metadata.Fields = append(metadata.Fields, fieldInfo)
 	}
 	
-	return metadata, fieldMappings, nil
+	return metadata, nil
 }
 
-// normalizeOptionKey normalizes option names for consistent mapping
-func normalizeOptionKey(name string) string {
-	// Convert to lowercase and replace spaces with underscores
-	key := strings.ToLower(name)
-	key = strings.ReplaceAll(key, " ", "_")
-	key = strings.ReplaceAll(key, "-", "_")
-	
-	// Map common variations to standard keys
-	switch key {
-	case "to_do", "todo", "backlog":
-		return "todo"
-	case "in_progress", "doing", "in_development":
-		return "in_progress"
-	case "in_review", "reviewing", "review":
-		return "in_review"
-	case "done", "completed", "complete", "closed":
-		return "done"
-	case "low", "p3", "p4":
-		return "low"
-	case "medium", "normal", "p2":
-		return "medium"
-	case "high", "p1":
-		return "high"
-	case "critical", "urgent", "p0":
-		return "critical"
-	default:
-		return key
-	}
-}

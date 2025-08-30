@@ -150,22 +150,26 @@ func TestSaveWithMetadata(t *testing.T) {
 		Project: ProjectMetadata{
 			ID: "PVT_kwHOAAlRwM4A8arc",
 		},
-		Fields: FieldsMetadata{
-			Status: &FieldMetadata{
-				ID: "PVTSSF_lAHOAAlRwM4A8arczgwbDH4",
-				Options: map[string]string{
-					"todo":        "f75ad846",
-					"in_progress": "47fc9ee4",
-					"done":        "98236657",
+		Fields: []FieldInfo{
+			{
+				Name:     "Status",
+				ID:       "PVTSSF_lAHOAAlRwM4A8arczgwbDH4",
+				DataType: "SINGLE_SELECT",
+				Options: []FieldOption{
+					{Name: "Todo", ID: "f75ad846"},
+					{Name: "In progress", ID: "47fc9ee4"},
+					{Name: "Done", ID: "98236657"},
 				},
 			},
-			Priority: &FieldMetadata{
-				ID: "PVTSSF_lAHOAAlRwM4A8arczgwbDH8",
-				Options: map[string]string{
-					"low":      "abc12345",
-					"medium":   "def67890",
-					"high":     "ghi13579",
-					"critical": "jkl24680",
+			{
+				Name:     "Priority",
+				ID:       "PVTSSF_lAHOAAlRwM4A8arczgwbDH8",
+				DataType: "SINGLE_SELECT",
+				Options: []FieldOption{
+					{Name: "Low", ID: "abc12345"},
+					{Name: "Medium", ID: "def67890"},
+					{Name: "High", ID: "ghi13579"},
+					{Name: "Critical", ID: "jkl24680"},
 				},
 			},
 		},
@@ -183,13 +187,31 @@ func TestSaveWithMetadata(t *testing.T) {
 	// Verify metadata was saved and loaded correctly
 	assert.NotNil(t, loadedCfg.Metadata)
 	assert.Equal(t, "PVT_kwHOAAlRwM4A8arc", loadedCfg.Metadata.Project.ID)
-	assert.NotNil(t, loadedCfg.Metadata.Fields.Status)
-	assert.Equal(t, "PVTSSF_lAHOAAlRwM4A8arczgwbDH4", loadedCfg.Metadata.Fields.Status.ID)
-	assert.Equal(t, "f75ad846", loadedCfg.Metadata.Fields.Status.Options["todo"])
-	assert.Equal(t, "47fc9ee4", loadedCfg.Metadata.Fields.Status.Options["in_progress"])
-	assert.NotNil(t, loadedCfg.Metadata.Fields.Priority)
-	assert.Equal(t, "PVTSSF_lAHOAAlRwM4A8arczgwbDH8", loadedCfg.Metadata.Fields.Priority.ID)
-	assert.Equal(t, "abc12345", loadedCfg.Metadata.Fields.Priority.Options["low"])
+	assert.Len(t, loadedCfg.Metadata.Fields, 2)
+	
+	// Find Status field
+	var statusField *FieldInfo
+	for _, field := range loadedCfg.Metadata.Fields {
+		if field.Name == "Status" {
+			statusField = &field
+			break
+		}
+	}
+	assert.NotNil(t, statusField)
+	assert.Equal(t, "PVTSSF_lAHOAAlRwM4A8arczgwbDH4", statusField.ID)
+	assert.Len(t, statusField.Options, 3)
+	
+	// Find Priority field
+	var priorityField *FieldInfo
+	for _, field := range loadedCfg.Metadata.Fields {
+		if field.Name == "Priority" {
+			priorityField = &field
+			break
+		}
+	}
+	assert.NotNil(t, priorityField)
+	assert.Equal(t, "PVTSSF_lAHOAAlRwM4A8arczgwbDH8", priorityField.ID)
+	assert.Len(t, priorityField.Options, 4)
 }
 
 func TestConfigWithoutMetadata(t *testing.T) {
@@ -249,12 +271,14 @@ func TestMetadataYAMLFormat(t *testing.T) {
 		Project: ProjectMetadata{
 			ID: "PVT_kwHOAAlRwM4A8arc",
 		},
-		Fields: FieldsMetadata{
-			Status: &FieldMetadata{
-				ID: "PVTSSF_status",
-				Options: map[string]string{
-					"todo": "opt_todo",
-					"done": "opt_done",
+		Fields: []FieldInfo{
+			{
+				Name:     "Status",
+				ID:       "PVTSSF_status",
+				DataType: "SINGLE_SELECT",
+				Options: []FieldOption{
+					{Name: "Todo", ID: "opt_todo"},
+					{Name: "Done", ID: "opt_done"},
 				},
 			},
 		},
@@ -271,15 +295,13 @@ func TestMetadataYAMLFormat(t *testing.T) {
 	assert.Contains(t, yamlStr, "project:")
 	assert.Contains(t, yamlStr, "id: PVT_kwHOAAlRwM4A8arc")
 	assert.Contains(t, yamlStr, "fields:")
-	assert.Contains(t, yamlStr, "status:")
+	assert.Contains(t, yamlStr, "- name: Status")
 	assert.Contains(t, yamlStr, "id: PVTSSF_status")
 	assert.Contains(t, yamlStr, "options:")
-	assert.Contains(t, yamlStr, "todo: opt_todo")
-	assert.Contains(t, yamlStr, "done: opt_done")
-	
-	// Verify priority field is not included in metadata when nil (but is in defaults)
-	// The yamlStr will contain "priority:" in the fields section, but not in metadata.fields
-	assert.NotRegexp(t, `(?m)^\s+priority:\s*\n\s+id:`, yamlStr)
+	assert.Contains(t, yamlStr, "- name: Todo")
+	assert.Contains(t, yamlStr, "id: opt_todo")
+	assert.Contains(t, yamlStr, "- name: Done")
+	assert.Contains(t, yamlStr, "id: opt_done")
 }
 
 func TestBackwardCompatibility(t *testing.T) {
