@@ -173,7 +173,7 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 	
 	// Get project fields if we need to update them or handle interactive features
 	var fields []project.Field
-	if projectID != "" && (len(triageConfig.Apply.Fields) > 0 || triageConfig.Interactive.Status) {
+	if projectID != "" && (len(triageConfig.Apply.Fields) > 0 || triageConfig.Interactive.Status || triageConfig.Interactive.Estimate) {
 		// Try to use cached fields first
 		if c.config.HasCachedFields() {
 			// Convert cached fields to project.Field format
@@ -289,20 +289,23 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 				}
 			}
 			
-			// Apply interactive status choice
-			if update.StatusChoice != nil {
-				if err := c.updateProjectField(projectID, update.ItemID, "Status", *update.StatusChoice, fields); err != nil {
-					fmt.Printf("Warning: failed to update status for issue #%d: %v\n", update.Issue.Number, err)
-				} else {
-					fmt.Printf("✓ Updated status to '%s' for issue #%d\n", *update.StatusChoice, update.Issue.Number)
+				// Apply interactive status choice
+				if update.StatusChoice != nil {
+					if err := c.updateProjectField(projectID, update.ItemID, "Status", *update.StatusChoice, fields); err != nil {
+						fmt.Printf("Warning: failed to update status for issue #%d: %v\n", update.Issue.Number, err)
+					} else {
+						fmt.Printf("✓ Updated status to '%s' for issue #%d\n", *update.StatusChoice, update.Issue.Number)
+					}
 				}
-			}
-			
-			// Apply interactive estimate choice
-			if update.EstimateChoice != nil {
-				// TODO: Implement estimate field update
-				fmt.Printf("✓ Set estimate '%s' for issue #%d (estimate field update not fully implemented)\n", *update.EstimateChoice, update.Issue.Number)
-			}
+				
+				// Apply interactive estimate choice
+				if update.EstimateChoice != nil {
+					if err := c.updateEstimateField(projectID, update.ItemID, *update.EstimateChoice, fields); err != nil {
+						fmt.Printf("Warning: failed to update estimate for issue #%d: %v\n", update.Issue.Number, err)
+					} else {
+						fmt.Printf("✓ Set estimate '%s' for issue #%d\n", *update.EstimateChoice, update.Issue.Number)
+					}
+				}
 		}
 	}
 	
@@ -436,10 +439,10 @@ func (c *TriageCommand) applyLabels(issueNumber int, labels []string) error {
 }
 
 func (c *TriageCommand) updateProjectField(projectID, itemID, fieldName, value string, fields []project.Field) error {
-	// Find the field by name
+	// Find the field by name (case-insensitive)
 	var targetField *project.Field
 	for _, field := range fields {
-		if field.Name == fieldName {
+		if strings.EqualFold(field.Name, fieldName) {
 			targetField = &field
 			break
 		}
@@ -452,39 +455,47 @@ func (c *TriageCommand) updateProjectField(projectID, itemID, fieldName, value s
 	// For single select fields, find the option ID
 	if targetField.DataType == "SINGLE_SELECT" {
 		var optionID string
-		// Look for matching option based on config mapping
-		if fieldName == "Status" {
-			if statusField, ok := c.config.Fields["status"]; ok {
-				// Use the configured mapping
-				if mappedValue, ok := statusField.Values[value]; ok {
-					// Find option with the mapped value
-					for _, option := range targetField.Options {
-						if option.Name == mappedValue {
-							optionID = option.ID
+		
+		// First try to use metadata for dynamic field lookup
+		if c.config.Metadata != nil && c.config.Metadata.Fields != nil {
+			// Find field metadata dynamically (case-insensitive)
+			for _, fieldMeta := range c.config.Metadata.Fields {
+				if strings.EqualFold(fieldMeta.Name, fieldName) {
+					// Try to find the option ID directly from metadata
+					for _, opt := range fieldMeta.Options {
+						if opt.Name == value {
+							optionID = opt.ID
 							break
 						}
 					}
-				}
-			}
-		} else if fieldName == "Priority" {
-			if priorityField, ok := c.config.Fields["priority"]; ok {
-				// Use the configured mapping
-				if mappedValue, ok := priorityField.Values[value]; ok {
-					// Find option with the mapped value
-					for _, option := range targetField.Options {
-						if option.Name == mappedValue {
-							optionID = option.ID
-							break
-						}
-					}
-				}
-			}
-		} else {
-			// Direct match
-			for _, option := range targetField.Options {
-				if option.Name == value {
-					optionID = option.ID
 					break
+				}
+			}
+		}
+		
+		// If not found in metadata, fall back to config field mappings
+		if optionID == "" {
+			// Convert field name to config key (e.g., "Status" -> "status")
+			configKey := strings.ToLower(fieldName)
+			
+			if configField, ok := c.config.Fields[configKey]; ok {
+				// Use the configured mapping
+				if mappedValue, ok := configField.Values[value]; ok {
+					// Find option with the mapped value
+					for _, option := range targetField.Options {
+						if option.Name == mappedValue {
+							optionID = option.ID
+							break
+						}
+					}
+				}
+			} else {
+				// Direct match as last resort
+				for _, option := range targetField.Options {
+					if option.Name == value {
+						optionID = option.ID
+						break
+					}
 				}
 			}
 		}
@@ -496,8 +507,100 @@ func (c *TriageCommand) updateProjectField(projectID, itemID, fieldName, value s
 		return c.issueAPI.UpdateProjectItemField(projectID, itemID, targetField.ID, optionID)
 	}
 	
+	// For TEXT fields
+	if targetField.DataType == "TEXT" {
+		gql := c.issueAPI.GetGraphQLClient()
+		mutation := `
+			mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $text: String!) {
+				updateProjectV2ItemFieldValue(
+					input: {
+						projectId: $projectId,
+						itemId: $itemId,
+						fieldId: $fieldId,
+						value: { text: $text }
+					}
+				) { projectV2Item { id } }
+			}`
+		variables := map[string]interface{}{
+			"projectId": projectID,
+			"itemId":    itemID,
+			"fieldId":   targetField.ID,
+			"text":      value,
+		}
+		var result map[string]interface{}
+		if err := gql.Do(mutation, variables, &result); err != nil {
+			return fmt.Errorf("failed to set %s text: %w", fieldName, err)
+		}
+		return nil
+	}
+	
+	// For NUMBER fields
+	if targetField.DataType == "NUMBER" {
+		// Try to parse the value as a number
+		num, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			// If not a pure number, try to extract number from strings like "2h", "3pts"
+			// This is a simple implementation - could be enhanced
+			for i, ch := range value {
+				if !('0' <= ch && ch <= '9' || ch == '.') {
+					if i > 0 {
+						num, err = strconv.ParseFloat(value[:i], 64)
+						if err == nil {
+							break
+						}
+					}
+					return fmt.Errorf("invalid numeric value '%s' for field '%s'", value, fieldName)
+				}
+			}
+		}
+		
+		gql := c.issueAPI.GetGraphQLClient()
+		mutation := `
+			mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $number: Float!) {
+				updateProjectV2ItemFieldValue(
+					input: {
+						projectId: $projectId,
+						itemId: $itemId,
+						fieldId: $fieldId,
+						value: { number: $number }
+					}
+				) { projectV2Item { id } }
+			}`
+		variables := map[string]interface{}{
+			"projectId": projectID,
+			"itemId":    itemID,
+			"fieldId":   targetField.ID,
+			"number":    num,
+		}
+		var result map[string]interface{}
+		if err := gql.Do(mutation, variables, &result); err != nil {
+			return fmt.Errorf("failed to set %s number: %w", fieldName, err)
+		}
+		return nil
+	}
+	
 	// For other field types, we'd need different handling
 	return fmt.Errorf("unsupported field type '%s' for field '%s'", targetField.DataType, fieldName)
+}
+
+// updateEstimateField updates the Estimate field (TEXT or NUMBER) on a project item
+func (c *TriageCommand) updateEstimateField(projectID, itemID, estimate string, fields []project.Field) error {
+    // Try to use the generic updateProjectField function first
+    // It now supports TEXT and NUMBER fields dynamically
+    
+    // Try "Estimate" field name first
+    err := c.updateProjectField(projectID, itemID, "Estimate", estimate, fields)
+    if err == nil {
+        return nil
+    }
+    
+    // If not found, try lowercase "estimate" as fallback
+    if strings.Contains(err.Error(), "not found") {
+        // Try with lowercase
+        return c.updateProjectField(projectID, itemID, "estimate", estimate, fields)
+    }
+    
+    return err
 }
 
 func (c *TriageCommand) collectStatusChoice(issue GitHubIssue, reader *bufio.Reader, fields []project.Field) *string {
