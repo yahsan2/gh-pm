@@ -161,10 +161,7 @@ func runTriage(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create project client: %w", err)
 	}
 	
-	issueClient, err := issue.NewClient()
-	if err != nil {
-		return fmt.Errorf("failed to create issue client: %w", err)
-	}
+	issueClient := issue.NewClient()
 	
 	// Create URL builder
 	urlBuilder := project.NewURLBuilder(cfg, projectClient)
