@@ -257,6 +257,7 @@ triage:
   # Auto-add tracking label and set defaults
   tracked:
     query: "is:issue is:open -label:pm-tracked"
+    instruction: "Starting triage for untracked issues. This will add the pm-tracked label and set default project fields."
     apply:
       labels:
         - pm-tracked
@@ -269,10 +270,19 @@ triage:
   # Interactive estimation
   estimate:
     query: "is:issue is:open status:backlog -has:estimate"
+    instruction: "Review issues that need estimation. Please provide time estimates for planning purposes."
     apply: {}
     interactive:
       estimate: true  # Prompt for estimate entry
 ```
+
+**Configuration Fields:**
+- `query`: GitHub search query to find issues to triage
+- `instruction`: Optional message displayed at the start of triage operation (useful for providing context or instructions to users)
+- `apply.labels`: Labels to automatically add to matching issues
+- `apply.fields`: Project field values to automatically set
+- `interactive.status`: Prompt for status selection for each issue
+- `interactive.estimate`: Prompt for estimate entry for each issue
 
 ### Priority Management
 

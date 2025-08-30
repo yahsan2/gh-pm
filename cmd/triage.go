@@ -124,6 +124,11 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 	
 	fmt.Printf("Found %d issues to triage\n", len(issues))
 	
+	// Display instruction if configured
+	if triageConfig.Instruction != "" {
+		fmt.Printf("\n%s\n\n", triageConfig.Instruction)
+	}
+	
 	// Get project ID if needed for field updates or interactive features
 	var projectID string
 	if len(triageConfig.Apply.Fields) > 0 || triageConfig.Interactive.Status || triageConfig.Interactive.Estimate {
@@ -727,6 +732,11 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 
 
 func (c *TriageCommand) displayIssuesList(issues []GitHubIssue, triageConfig config.TriageConfig) error {
+	// Display instruction if configured
+	if triageConfig.Instruction != "" {
+		fmt.Printf("%s\n\n", triageConfig.Instruction)
+	}
+	
 	// Display issues that would be affected
 	for i, issue := range issues {
 		fmt.Printf("%d. #%d: %s\n", i+1, issue.Number, issue.Title)

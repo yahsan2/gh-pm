@@ -45,6 +45,7 @@ type Field struct {
 // TriageConfig represents a triage configuration
 type TriageConfig struct {
 	Query       string            `yaml:"query"`
+	Instruction string            `yaml:"instruction,omitempty"`
 	Apply       TriageApply       `yaml:"apply"`
 	Interactive TriageInteractive `yaml:"interactive,omitempty"`
 }
