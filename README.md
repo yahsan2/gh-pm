@@ -253,9 +253,15 @@ gh pm triage estimate  # If configured with interactive fields
 # Ad-hoc triage with query and apply (without configuration file)
 gh pm triage --query="status:backlog -has:estimate" --apply="status:in_progress"
 
+# Preview what would be changed without applying
+gh pm triage --query="status:backlog" --apply="priority:p1" --list
+
 # Ad-hoc triage with interactive mode for specific fields
 gh pm triage --query="status:backlog" --interactive="status,estimate"
 gh pm triage --query="-has:priority" --interactive="priority"
+
+# List issues matching query without any changes
+gh pm triage --query="status:backlog -has:estimate" --list
 ```
 
 **Triage Configuration Example (.gh-pm.yml):**

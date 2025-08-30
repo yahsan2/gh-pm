@@ -98,9 +98,9 @@ func runTriage(cmd *cobra.Command, args []string) error {
 	
 	// Check if using ad-hoc mode or named configuration
 	if queryFlag != "" {
-		// Ad-hoc mode: --query is required, --apply or --interactive is required
-		if len(applyFlags) == 0 && len(interactiveFields) == 0 {
-			return fmt.Errorf("--query requires either --apply or --interactive flag")
+		// Ad-hoc mode: --query is required, --apply or --interactive is required (unless --list is specified)
+		if len(applyFlags) == 0 && len(interactiveFields) == 0 && !listOnly {
+			return fmt.Errorf("--query requires either --apply or --interactive flag (or use --list to preview)")
 		}
 		
 		// Build triage config from flags
