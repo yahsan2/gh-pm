@@ -251,10 +251,10 @@ gh pm triage estimate --dry-run  # Same as --list
 gh pm triage estimate  # If configured with interactive fields
 
 # Ad-hoc triage with query and apply (without configuration file)
-gh pm triage --query="Status:backlog -has:estimate" --apply="status:in-progress"
+gh pm triage --query="status:backlog -has:estimate" --apply="status:in-progress"
 
 # Ad-hoc triage with interactive mode for specific fields
-gh pm triage --query="Status:backlog" --interactive="status,estimate"
+gh pm triage --query="status:backlog" --interactive="status,estimate"
 gh pm triage --query="-has:priority" --interactive="priority"
 ```
 
@@ -295,10 +295,11 @@ triage:
 
 gh-pm extends GitHub's standard search syntax with project-specific filters:
 
-- **Field filters**: `Status:backlog`, `Priority:critical` - Filter by project field values
+- **Field filters**: `status:backlog`, `priority:critical` - Filter by project field values (case-insensitive)
 - **Field exclusion** (gh-pm exclusive): `-has:estimate` - Find issues missing a field value
 - **Label exclusion**: `-label:bug` - Exclude issues with specific labels
-- **Combined queries**: `Status:backlog -has:estimate -label:blocked`
+- **Combined queries**: `status:backlog -has:estimate -label:blocked`
+- **Config field names**: Use either actual field names (`Status:backlog`) or config names (`status:backlog`)
 
 Note: The `-has:` operator is a gh-pm extension not available in standard GitHub search. It uses GraphQL to filter issues missing specific project field values.
 

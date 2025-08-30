@@ -34,10 +34,10 @@ This command will:
   gh pm triage hogehoge --dry-run
   
   # Ad-hoc triage with query and apply
-  gh pm triage --query="Status:backlog -has:estimate" --apply="status:in-progress"
+  gh pm triage --query="status:backlog -has:estimate" --apply="status:in-progress"
   
   # Ad-hoc triage with interactive mode for specific fields
-  gh pm triage --query="Status:backlog" --interactive="status,estimate"
+  gh pm triage --query="status:backlog" --interactive="status,estimate"
   gh pm triage --query="-has:priority" --interactive="priority"`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runTriage,
@@ -459,11 +459,40 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 		// Check for field exclusions (-has:fieldname)
 		if strings.HasPrefix(part, "-has:") {
 			fieldName := strings.TrimPrefix(part, "-has:")
+			fieldFound := false
+			
 			// Try to find the field in metadata (case-insensitive)
 			for availField := range availableFields {
 				if strings.EqualFold(availField, fieldName) {
 					fieldExcludes[availField] = true
+					fieldFound = true
 					break
+				}
+			}
+			
+			// If not found in metadata, check config field names
+			if !fieldFound && c.config.Fields != nil {
+				// Check if it's a config field name (like "status", "priority", "estimate")
+				if configField, ok := c.config.Fields[strings.ToLower(fieldName)]; ok {
+					// Use the actual field name from config
+					actualFieldName := configField.Field
+					if actualFieldName != "" {
+						// Check if this field exists in metadata
+						for availField := range availableFields {
+							if strings.EqualFold(availField, actualFieldName) {
+								fieldExcludes[availField] = true
+								break
+							}
+						}
+					}
+				} else {
+					// Special case for "estimate" which might be "Estimate" field
+					for availField := range availableFields {
+						if strings.EqualFold(availField, fieldName) {
+							fieldExcludes[availField] = true
+							break
+						}
+					}
 				}
 			}
 			continue
@@ -475,9 +504,28 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 			fieldName := part[:colonIdx]
 			fieldValue := part[colonIdx+1:]
 			
-			// If this field exists in metadata, add it to filters
-			if availableFields[fieldName] {
-				fieldFilters[fieldName] = fieldValue
+			// Try to find field in metadata (case-insensitive) or config
+			fieldFound := false
+			
+			// First check metadata fields (case-insensitive)
+			for availField := range availableFields {
+				if strings.EqualFold(availField, fieldName) {
+					fieldFilters[availField] = fieldValue
+					fieldFound = true
+					break
+				}
+			}
+			
+			// If not found in metadata, check config field names
+			if !fieldFound && c.config.Fields != nil {
+				// Check if it's a config field name (like "status", "priority")
+				if configField, ok := c.config.Fields[strings.ToLower(fieldName)]; ok {
+					// Use the actual field name from config
+					actualFieldName := configField.Field
+					if actualFieldName != "" {
+						fieldFilters[actualFieldName] = fieldValue
+					}
+				}
 			}
 		}
 	}
