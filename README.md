@@ -41,15 +41,6 @@ The `init` command creates a `.gh-pm.yml` configuration file with automatic proj
 ```bash
 # Interactive initialization (auto-detects current repository and lists available projects)
 gh pm init
-
-# Specify project and repositories
-gh pm init --project "My Project" --repo owner/repo1,owner/repo2
-
-# Organization project
-gh pm init --project "Team Project" --org my-organization
-
-# Skip metadata caching (for simpler config)
-gh pm init --skip-metadata
 ```
 
 **Features:**
