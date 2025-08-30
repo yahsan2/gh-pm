@@ -316,6 +316,7 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 	// Parse query to extract field filters
 	fieldFilters := make(map[string]string) // field name -> filter value
+	fieldExcludes := make(map[string]bool) // field name -> true if should be empty/unset
 	var labelExcludes []string
 	
 	// Get available field names from metadata
@@ -334,6 +335,19 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 			continue
 		}
 		
+		// Check for field exclusions (-has:fieldname)
+		if strings.HasPrefix(part, "-has:") {
+			fieldName := strings.TrimPrefix(part, "-has:")
+			// Try to find the field in metadata (case-insensitive)
+			for availField := range availableFields {
+				if strings.EqualFold(availField, fieldName) {
+					fieldExcludes[availField] = true
+					break
+				}
+			}
+			continue
+		}
+		
 		// Check for field filters dynamically
 		if strings.Contains(part, ":") {
 			colonIdx := strings.Index(part, ":")
@@ -347,9 +361,9 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 		}
 	}
 	
-	// If we have field filters and project metadata, use optimized GraphQL query
-	if len(fieldFilters) > 0 && c.config.Metadata != nil && c.config.Metadata.Project.ID != "" {
-		return c.searchIssuesWithProjectFields(fieldFilters, labelExcludes)
+	// If we have field filters/excludes and project metadata, use optimized GraphQL query
+	if (len(fieldFilters) > 0 || len(fieldExcludes) > 0) && c.config.Metadata != nil && c.config.Metadata.Project.ID != "" {
+		return c.searchIssuesWithProjectFields(fieldFilters, fieldExcludes, labelExcludes)
 	}
 	
 	// Fallback to original implementation for label-only filters
@@ -691,7 +705,7 @@ func (c *TriageCommand) collectEstimateChoice(issue GitHubIssue, reader *bufio.R
 }
 
 
-func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]string, labelExcludes []string) ([]GitHubIssue, error) {
+func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]string, fieldExcludes map[string]bool, labelExcludes []string) ([]GitHubIssue, error) {
 	projectID := c.config.Metadata.Project.ID
 	
 	// Build GraphQL query to get all project items with field values
@@ -732,6 +746,24 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 										}
 										optionId
 										name
+									}
+									... on ProjectV2ItemFieldTextValue {
+										field {
+											... on ProjectV2Field {
+												id
+												name
+											}
+										}
+										text
+									}
+									... on ProjectV2ItemFieldNumberValue {
+										field {
+											... on ProjectV2Field {
+												id
+												name
+											}
+										}
+										number
 									}
 								}
 							}
@@ -790,14 +822,7 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 							} `json:"labels"`
 						} `json:"content"`
 						FieldValues struct {
-							Nodes []struct {
-								Field struct {
-									ID   string `json:"id"`
-									Name string `json:"name"`
-								} `json:"field"`
-								OptionID string `json:"optionId"`
-								Name     string `json:"name"`
-							} `json:"nodes"`
+							Nodes []map[string]interface{} `json:"nodes"`
 						} `json:"fieldValues"`
 					} `json:"nodes"`
 				} `json:"items"`
@@ -833,19 +858,69 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 				continue
 			}
 			
+			// Build a map of field values for this item
+			itemFieldValues := make(map[string]interface{})
+			for _, fieldValueNode := range item.FieldValues.Nodes {
+				if fieldData, ok := fieldValueNode["field"].(map[string]interface{}); ok {
+					if fieldID, ok := fieldData["id"].(string); ok {
+						if fieldName, ok := fieldData["name"].(string); ok {
+							// Check for different field value types
+							if optionID, ok := fieldValueNode["optionId"].(string); ok {
+								// Single select field
+								itemFieldValues[fieldID] = optionID
+							} else if text, ok := fieldValueNode["text"].(string); ok {
+								// Text field
+								itemFieldValues[fieldName] = text
+							} else if number, ok := fieldValueNode["number"].(float64); ok {
+								// Number field
+								itemFieldValues[fieldName] = number
+							}
+						}
+					}
+				}
+			}
+			
 			// Check field filters
 			matchesAllFilters := true
 			for fieldID, requiredOptionID := range filterOptionIDs {
-				found := false
-				for _, fieldValue := range item.FieldValues.Nodes {
-					if fieldValue.Field.ID == fieldID && fieldValue.OptionID == requiredOptionID {
-						found = true
+				if value, exists := itemFieldValues[fieldID]; exists {
+					if value != requiredOptionID {
+						matchesAllFilters = false
 						break
 					}
-				}
-				if !found {
+				} else {
 					matchesAllFilters = false
 					break
+				}
+			}
+			
+			// Check field exclusions (e.g., -has:estimate)
+			if matchesAllFilters {
+				for excludeFieldName := range fieldExcludes {
+					// Check if this field has any value
+					hasValue := false
+					for fieldName, value := range itemFieldValues {
+						if strings.EqualFold(fieldName, excludeFieldName) {
+							// Check if the value is not empty
+							switch v := value.(type) {
+							case string:
+								if v != "" {
+									hasValue = true
+								}
+							case float64:
+								hasValue = true // any number means it has a value
+							default:
+								if v != nil {
+									hasValue = true
+								}
+							}
+							break
+						}
+					}
+					if hasValue {
+						matchesAllFilters = false
+						break
+					}
 				}
 			}
 			
