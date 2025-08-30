@@ -44,7 +44,16 @@ Examples:
   
   # Split from command arguments
   gh pm split 123 "Task 1" "Task 2" "Task 3"`,
-	Args: cobra.MinimumNArgs(1),
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 1 {
+			return fmt.Errorf("requires at least 1 argument")
+		}
+		// Validate that the first argument is a valid issue number
+		if _, err := strconv.Atoi(args[0]); err != nil {
+			return fmt.Errorf("invalid issue number: %s", args[0])
+		}
+		return nil
+	},
 	RunE: runSplit,
 }
 
@@ -397,7 +406,7 @@ func extractTasksFromReader(reader io.Reader) ([]string, error) {
 }
 
 func extractChecklistItems(text string) []string {
-	var tasks []string
+	tasks := []string{}
 	
 	// Match GitHub-style checkboxes: - [ ] or - [x]
 	checkboxPattern := regexp.MustCompile(`^[\s]*[-*]\s*\[[ xX]\]\s*(.+)`)

@@ -303,6 +303,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 						} else {
 							cfg.Metadata = metadata
 							fmt.Printf("✓ Cached metadata for %d fields\n", len(fields))
+							
+							// Update fields configuration from metadata
+							updateFieldsFromMetadata(cfg, metadata)
 						}
 					}
 				}
@@ -388,6 +391,67 @@ func selectProject(projects []project.Project, orgName string) *project.Project 
 
 	fmt.Println("Invalid selection, skipping project selection.")
 	return nil
+}
+
+// updateFieldsFromMetadata updates the fields configuration based on actual project metadata
+func updateFieldsFromMetadata(cfg *config.Config, metadata *config.ConfigMetadata) {
+	if cfg.Fields == nil {
+		cfg.Fields = make(map[string]config.Field)
+	}
+	
+	// Update Status field configuration from metadata
+	for _, field := range metadata.Fields {
+		if field.Name == "Status" && field.DataType == "SINGLE_SELECT" && len(field.Options) > 0 {
+			statusField := config.Field{
+				Field:  "Status",
+				Values: make(map[string]string),
+			}
+			
+			for _, opt := range field.Options {
+				// Create a normalized key for each option
+				key := strings.ToLower(opt.Name)
+				key = strings.ReplaceAll(key, " ", "_")
+				statusField.Values[key] = opt.Name
+			}
+			
+			cfg.Fields["status"] = statusField
+			fmt.Printf("✓ Updated status field configuration with %d values\n", len(field.Options))
+		}
+		
+		// Update Priority field configuration from metadata
+		if field.Name == "Priority" && field.DataType == "SINGLE_SELECT" && len(field.Options) > 0 {
+			priorityField := config.Field{
+				Field:  "Priority",
+				Values: make(map[string]string),
+			}
+			
+			for _, opt := range field.Options {
+				// For Priority, use the actual names (P0, P1, P2)
+				key := strings.ToLower(opt.Name)
+				priorityField.Values[key] = opt.Name
+			}
+			
+			cfg.Fields["priority"] = priorityField
+			fmt.Printf("✓ Updated priority field configuration with %d values\n", len(field.Options))
+		}
+	}
+	
+	// Update default values to match actual project values
+	if statusField, ok := cfg.Fields["status"]; ok {
+		// Set default status to "backlog" if it exists
+		if _, hasBacklog := statusField.Values["backlog"]; hasBacklog {
+			cfg.Defaults.Status = "backlog"
+		} else if _, hasTodo := statusField.Values["todo"]; hasTodo {
+			cfg.Defaults.Status = "todo"
+		}
+	}
+	
+	if priorityField, ok := cfg.Fields["priority"]; ok {
+		// Set default priority to "p2" if it exists, otherwise keep "medium"
+		if _, hasP2 := priorityField.Values["p2"]; hasP2 {
+			cfg.Defaults.Priority = "p2"
+		}
+	}
 }
 
 // selectProjectWithDetails presents a detailed list of projects and allows the user to select one
