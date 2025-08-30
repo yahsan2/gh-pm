@@ -224,8 +224,8 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 	
 	// Get available field names from metadata
 	availableFields := make(map[string]bool)
-	if c.config.Metadata != nil && c.config.Metadata.Fields != nil {
-		for fieldName := range c.config.Metadata.Fields {
+	if c.config.FieldMappings != nil {
+		for fieldName := range c.config.FieldMappings {
 			availableFields[fieldName] = true
 		}
 	}
@@ -577,8 +577,8 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 	
 	// Map field filters to option IDs using metadata dynamically
 	for fieldName, filterValue := range fieldFilters {
-		if c.config.Metadata.Fields != nil {
-			if fieldMeta, exists := c.config.Metadata.Fields[fieldName]; exists && fieldMeta != nil && filterValue != "" {
+		if c.config.FieldMappings != nil {
+			if fieldMeta, exists := c.config.FieldMappings[fieldName]; exists && fieldMeta != nil && filterValue != "" {
 				if optionID, ok := fieldMeta.Options[filterValue]; ok {
 					filterOptionIDs[fieldMeta.ID] = optionID
 				}

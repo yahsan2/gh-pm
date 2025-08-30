@@ -64,42 +64,61 @@ func (m *MetadataManager) FetchFieldMetadata(projectID string, fieldName string)
 }
 
 // BuildMetadata builds complete metadata structure for a project
-func (m *MetadataManager) BuildMetadata(proj *project.Project, fields []project.Field) (*config.ConfigMetadata, error) {
+// It returns both metadata and field mappings
+func (m *MetadataManager) BuildMetadata(proj *project.Project, fields []project.Field) (*config.ConfigMetadata, config.FieldsMetadata, error) {
 	if proj == nil {
-		return nil, fmt.Errorf("project is nil")
+		return nil, nil, fmt.Errorf("project is nil")
 	}
 	
 	metadata := &config.ConfigMetadata{
 		Project: config.ProjectMetadata{
 			ID: proj.ID,
 		},
-		Fields: config.FieldsMetadata{},
+		Fields: make([]config.FieldInfo, 0, len(fields)),
 	}
 	
-	// Process fields to find Status and Priority
+	fieldMappings := config.FieldsMetadata{}
+	
+	// Cache ALL fields information for future reference
 	for _, field := range fields {
-		if field.DataType != "SINGLE_SELECT" || len(field.Options) == 0 {
-			continue
+		// Store all field information
+		fieldInfo := config.FieldInfo{
+			Name:     field.Name,
+			ID:       field.ID,
+			DataType: field.DataType,
 		}
 		
-		// Build options mapping
-		options := make(map[string]string)
-		for _, opt := range field.Options {
-			key := normalizeOptionKey(opt.Name)
-			options[key] = opt.ID
+		// If it's a single select field, also store the options
+		if field.DataType == "SINGLE_SELECT" && len(field.Options) > 0 {
+			fieldInfo.Options = make([]config.FieldOption, 0, len(field.Options))
+			for _, opt := range field.Options {
+				fieldInfo.Options = append(fieldInfo.Options, config.FieldOption{
+					Name: opt.Name,
+					ID:   opt.ID,
+				})
+			}
+			
+			// Build options mapping for backward compatibility
+			options := make(map[string]string)
+			for _, opt := range field.Options {
+				key := normalizeOptionKey(opt.Name)
+				options[key] = opt.ID
+			}
+			
+			fieldMeta := &config.FieldMetadata{
+				ID:      field.ID,
+				Options: options,
+			}
+			
+			// Store field metadata with field name as key
+			// Using the actual field name to support dynamic field names
+			fieldMappings[field.Name] = fieldMeta
 		}
 		
-		fieldMeta := &config.FieldMetadata{
-			ID:      field.ID,
-			Options: options,
-		}
-		
-		// Store field metadata with field name as key
-		// Using the actual field name to support dynamic field names
-		metadata.Fields[field.Name] = fieldMeta
+		metadata.Fields = append(metadata.Fields, fieldInfo)
 	}
 	
-	return metadata, nil
+	return metadata, fieldMappings, nil
 }
 
 // normalizeOptionKey normalizes option names for consistent mapping

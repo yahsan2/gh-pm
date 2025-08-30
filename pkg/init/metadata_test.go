@@ -85,25 +85,26 @@ func TestMetadataManager_BuildMetadata(t *testing.T) {
 	}
 	
 	manager := &MetadataManager{}
-	metadata, err := manager.BuildMetadata(proj, fields)
+	metadata, fieldMappings, err := manager.BuildMetadata(proj, fields)
 	
 	assert.NoError(t, err)
 	assert.NotNil(t, metadata)
+	assert.NotNil(t, fieldMappings)
 	assert.Equal(t, "PVT_test123", metadata.Project.ID)
 	
 	// Check Status field metadata
-	assert.NotNil(t, metadata.Fields.Status)
-	assert.Equal(t, "FIELD_status", metadata.Fields.Status.ID)
-	assert.Equal(t, "opt_todo", metadata.Fields.Status.Options["todo"])
-	assert.Equal(t, "opt_progress", metadata.Fields.Status.Options["in_progress"])
-	assert.Equal(t, "opt_done", metadata.Fields.Status.Options["done"])
+	assert.NotNil(t, fieldMappings["Status"])
+	assert.Equal(t, "FIELD_status", fieldMappings["Status"].ID)
+	assert.Equal(t, "opt_todo", fieldMappings["Status"].Options["todo"])
+	assert.Equal(t, "opt_progress", fieldMappings["Status"].Options["in_progress"])
+	assert.Equal(t, "opt_done", fieldMappings["Status"].Options["done"])
 	
 	// Check Priority field metadata
-	assert.NotNil(t, metadata.Fields.Priority)
-	assert.Equal(t, "FIELD_priority", metadata.Fields.Priority.ID)
-	assert.Equal(t, "opt_low", metadata.Fields.Priority.Options["low"])
-	assert.Equal(t, "opt_medium", metadata.Fields.Priority.Options["medium"])
-	assert.Equal(t, "opt_high", metadata.Fields.Priority.Options["high"])
+	assert.NotNil(t, fieldMappings["Priority"])
+	assert.Equal(t, "FIELD_priority", fieldMappings["Priority"].ID)
+	assert.Equal(t, "opt_low", fieldMappings["Priority"].Options["low"])
+	assert.Equal(t, "opt_medium", fieldMappings["Priority"].Options["medium"])
+	assert.Equal(t, "opt_high", fieldMappings["Priority"].Options["high"])
 }
 
 func TestMetadataManager_BuildMetadata_NoSingleSelectFields(t *testing.T) {
@@ -127,21 +128,23 @@ func TestMetadataManager_BuildMetadata_NoSingleSelectFields(t *testing.T) {
 	}
 	
 	manager := &MetadataManager{}
-	metadata, err := manager.BuildMetadata(proj, fields)
+	metadata, fieldMappings, err := manager.BuildMetadata(proj, fields)
 	
 	assert.NoError(t, err)
 	assert.NotNil(t, metadata)
+	assert.NotNil(t, fieldMappings)
 	assert.Equal(t, "PVT_test456", metadata.Project.ID)
-	assert.Nil(t, metadata.Fields.Status)
-	assert.Nil(t, metadata.Fields.Priority)
+	assert.Nil(t, fieldMappings["Status"])
+	assert.Nil(t, fieldMappings["Priority"])
 }
 
 func TestMetadataManager_BuildMetadata_NilProject(t *testing.T) {
 	manager := &MetadataManager{}
-	metadata, err := manager.BuildMetadata(nil, []project.Field{})
+	metadata, fieldMappings, err := manager.BuildMetadata(nil, []project.Field{})
 	
 	assert.Error(t, err)
 	assert.Nil(t, metadata)
+	assert.Nil(t, fieldMappings)
 	assert.Contains(t, err.Error(), "project is nil")
 }
 
@@ -179,18 +182,19 @@ func TestMetadataManager_BuildMetadata_PartialFields(t *testing.T) {
 	}
 	
 	manager := &MetadataManager{}
-	metadata, err := manager.BuildMetadata(proj, fields)
+	metadata, fieldMappings, err := manager.BuildMetadata(proj, fields)
 	
 	assert.NoError(t, err)
 	assert.NotNil(t, metadata)
-	assert.NotNil(t, metadata.Fields.Status)
-	assert.Nil(t, metadata.Fields.Priority)
+	assert.NotNil(t, fieldMappings)
+	assert.NotNil(t, fieldMappings["Status"])
+	assert.Nil(t, fieldMappings["Priority"])
 	
 	// Check that non-standard status names are normalized appropriately
-	assert.Equal(t, "opt_new", metadata.Fields.Status.Options["new"])
-	assert.Equal(t, "opt_active", metadata.Fields.Status.Options["active"])
+	assert.Equal(t, "opt_new", fieldMappings["Status"].Options["new"])
+	assert.Equal(t, "opt_active", fieldMappings["Status"].Options["active"])
 	// "Closed" gets normalized to "done" by normalizeOptionKey
-	assert.Equal(t, "opt_closed", metadata.Fields.Status.Options["done"])
+	assert.Equal(t, "opt_closed", fieldMappings["Status"].Options["done"])
 }
 
 func TestConfigMetadata_Integration(t *testing.T) {
@@ -199,24 +203,29 @@ func TestConfigMetadata_Integration(t *testing.T) {
 		Project: config.ProjectMetadata{
 			ID: "PVT_integration",
 		},
-		Fields: config.FieldsMetadata{
-			Status: &config.FieldMetadata{
-				ID: "FIELD_status_int",
-				Options: map[string]string{
-					"todo": "opt_todo_int",
-					"done": "opt_done_int",
-				},
+	}
+	
+	fieldMappings := config.FieldsMetadata{
+		"Status": &config.FieldMetadata{
+			ID: "FIELD_status_int",
+			Options: map[string]string{
+				"todo": "opt_todo_int",
+				"done": "opt_done_int",
 			},
 		},
 	}
 	
 	cfg := config.DefaultConfig()
 	cfg.Metadata = metadata
+	cfg.FieldMappings = fieldMappings
 	
 	// Verify metadata is accessible
 	loadedMetadata, err := cfg.LoadMetadata()
 	assert.NoError(t, err)
 	assert.NotNil(t, loadedMetadata)
 	assert.Equal(t, "PVT_integration", loadedMetadata.Project.ID)
-	assert.Equal(t, "opt_todo_int", loadedMetadata.Fields.Status.Options["todo"])
+	
+	// Verify field mappings are accessible
+	assert.NotNil(t, cfg.FieldMappings)
+	assert.Equal(t, "opt_todo_int", cfg.FieldMappings["Status"].Options["todo"])
 }

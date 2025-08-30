@@ -291,27 +291,39 @@ func runInit(cmd *cobra.Command, args []string) error {
 				}
 				fmt.Printf("✓ Found project: %s (#%d)\n", proj.Title, proj.Number)
 				
-				// Fetch and display available fields
+				// Always fetch and cache ALL project fields
 				fields, err := client.GetProjectFields(proj.ID)
-				if err == nil && len(fields) > 0 {
-					fmt.Println("\nAvailable project fields:")
-					for _, field := range fields {
-						fmt.Printf("  - %s (%s)\n", field.Name, field.DataType)
+				if err != nil {
+					fmt.Printf("Warning: Could not fetch project fields: %v\n", err)
+				} else {
+					if len(fields) > 0 {
+						fmt.Printf("\n✓ Found %d project fields\n", len(fields))
+						fmt.Println("\nAvailable project fields:")
+						for _, field := range fields {
+							fmt.Printf("  - %s (%s)\n", field.Name, field.DataType)
+							if field.DataType == "SINGLE_SELECT" && len(field.Options) > 0 {
+								fmt.Printf("    Options: %d available\n", len(field.Options))
+							}
+						}
+						
+						// Auto-configure field mappings in non-interactive mode
+						if !initInteractive {
+							autoConfigureFieldMappings(cfg, fields)
+						}
+					} else {
+						fmt.Println("\nNo custom fields found in the project.")
 					}
 					
-					// Auto-configure field mappings in non-interactive mode
-					if !initInteractive {
-						autoConfigureFieldMappings(cfg, fields)
-					}
-					
-					// Build metadata if not skipping
+					// Always build and cache metadata (including all fields)
 					if !skipMetadata {
 						metadataManager := initpkg.NewMetadataManager(client)
-						metadata, err := metadataManager.BuildMetadata(proj, fields)
+						metadata, fieldMappings, err := metadataManager.BuildMetadata(proj, fields)
 						if err != nil {
 							fmt.Printf("Warning: Could not build metadata: %v\n", err)
 						} else {
 							cfg.Metadata = metadata
+							cfg.FieldMappings = fieldMappings
+							fmt.Printf("✓ Cached metadata for %d fields\n", len(fields))
 						}
 					}
 				}
@@ -577,15 +589,16 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 		return
 	}
 	
-	// Build metadata if not skipping
+	// Always build and cache metadata (including all fields)
 	if !skipMetadata {
 		metadataManager := initpkg.NewMetadataManager(client)
-		metadata, err := metadataManager.BuildMetadata(proj, fields)
+		metadata, fieldMappings, err := metadataManager.BuildMetadata(proj, fields)
 		if err != nil {
 			fmt.Printf("Warning: Could not build metadata: %v\n", err)
 		} else {
 			cfg.Metadata = metadata
-			fmt.Println("✓ Project metadata captured for faster operations")
+			cfg.FieldMappings = fieldMappings
+			fmt.Printf("✓ Project metadata captured with %d fields for faster operations\n", len(fields))
 		}
 	}
 	

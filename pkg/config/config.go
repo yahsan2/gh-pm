@@ -13,12 +13,13 @@ const ConfigFileName = ".gh-pm.yml"
 
 // Config represents the project configuration
 type Config struct {
-	Project      ProjectConfig             `yaml:"project"`
-	Repositories []string                  `yaml:"repositories"`
-	Defaults     DefaultsConfig            `yaml:"defaults"`
-	Fields       map[string]Field          `yaml:"fields"`
-	Triage       map[string]TriageConfig   `yaml:"triage,omitempty"`
-	Metadata     *ConfigMetadata           `yaml:"metadata,omitempty"`
+	Project       ProjectConfig             `yaml:"project"`
+	Repositories  []string                  `yaml:"repositories"`
+	Defaults      DefaultsConfig            `yaml:"defaults"`
+	Fields        map[string]Field          `yaml:"fields"`
+	Triage        map[string]TriageConfig   `yaml:"triage,omitempty"`
+	FieldMappings FieldsMetadata            `yaml:"field_mappings,omitempty"` // Field value mappings for Status, Priority, etc.
+	Metadata      *ConfigMetadata           `yaml:"metadata,omitempty"`
 }
 
 // ProjectConfig represents project settings
@@ -65,7 +66,7 @@ type TriageInteractive struct {
 // ConfigMetadata represents cached project metadata
 type ConfigMetadata struct {
 	Project ProjectMetadata `yaml:"project"`
-	Fields  FieldsMetadata  `yaml:"fields"`
+	Fields  []FieldInfo     `yaml:"fields,omitempty"` // All project fields
 }
 
 // ProjectMetadata represents cached project IDs
@@ -80,6 +81,20 @@ type FieldsMetadata map[string]*FieldMetadata
 type FieldMetadata struct {
 	ID      string            `yaml:"id"`      // Field ID
 	Options map[string]string `yaml:"options"` // name -> option ID
+}
+
+// FieldInfo represents complete field information
+type FieldInfo struct {
+	Name     string        `yaml:"name"`
+	ID       string        `yaml:"id"`
+	DataType string        `yaml:"data_type"`
+	Options  []FieldOption `yaml:"options,omitempty"`
+}
+
+// FieldOption represents a field option
+type FieldOption struct {
+	Name string `yaml:"name"`
+	ID   string `yaml:"id"`
 }
 
 // DefaultConfig returns a default configuration
@@ -303,15 +318,56 @@ func (c *Config) SetProjectID(id string) {
 
 // GetFieldMetadata returns metadata for a specific field
 func (c *Config) GetFieldMetadata(fieldName string) *FieldMetadata {
-	if c.Metadata == nil || c.Metadata.Fields == nil {
+	if c.FieldMappings == nil {
 		return nil
 	}
 	
-	if fieldMeta, exists := c.Metadata.Fields[fieldName]; exists {
+	if fieldMeta, exists := c.FieldMappings[fieldName]; exists {
 		return fieldMeta
 	}
 	
 	return nil
+}
+
+// GetAllFields returns all cached field information
+func (c *Config) GetAllFields() []FieldInfo {
+	if c.Metadata == nil {
+		return nil
+	}
+	return c.Metadata.Fields
+}
+
+// GetFieldByName returns field information by name
+func (c *Config) GetFieldByName(name string) *FieldInfo {
+	if c.Metadata == nil || c.Metadata.Fields == nil {
+		return nil
+	}
+	
+	for _, field := range c.Metadata.Fields {
+		if field.Name == name {
+			return &field
+		}
+	}
+	return nil
+}
+
+// GetFieldByID returns field information by ID
+func (c *Config) GetFieldByID(id string) *FieldInfo {
+	if c.Metadata == nil || c.Metadata.Fields == nil {
+		return nil
+	}
+	
+	for _, field := range c.Metadata.Fields {
+		if field.ID == id {
+			return &field
+		}
+	}
+	return nil
+}
+
+// HasCachedFields returns true if field metadata is cached
+func (c *Config) HasCachedFields() bool {
+	return c.Metadata != nil && len(c.Metadata.Fields) > 0
 }
 
 // isValidRepository checks if a repository string is in the correct format
