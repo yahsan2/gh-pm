@@ -18,8 +18,9 @@ import (
 )
 
 var (
-	splitFrom string
-	splitRepo string
+	splitFrom  string
+	splitRepo  string
+	splitDryRun bool
 )
 
 // splitCmd represents the split command
@@ -51,6 +52,7 @@ func init() {
 	rootCmd.AddCommand(splitCmd)
 	splitCmd.Flags().StringVar(&splitFrom, "from", "", "Source of tasks: 'body' (issue body) or file path")
 	splitCmd.Flags().StringVar(&splitRepo, "repo", "", "Repository (owner/repo format)")
+	splitCmd.Flags().BoolVar(&splitDryRun, "dry-run", false, "Preview what would be created without making changes")
 }
 
 // isGhSubIssueInstalled checks if gh sub-issue extension is installed
@@ -124,8 +126,8 @@ func isTaskAlreadySubIssue(task string, existingSubIssues []SubIssueInfo) bool {
 }
 
 func runSplit(cmd *cobra.Command, args []string) error {
-	// Check if gh sub-issue extension is installed
-	if !isGhSubIssueInstalled() {
+	// Check if gh sub-issue extension is installed (skip for dry-run)
+	if !splitDryRun && !isGhSubIssueInstalled() {
 		fmt.Println("❌ gh sub-issue extension is not installed.")
 		fmt.Println("\nThis command requires the gh sub-issue extension to create properly linked sub-issues.")
 		fmt.Println("Please install it by running:")
@@ -183,8 +185,12 @@ func runSplit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no tasks found to create sub-issues")
 	}
 
-	// Create sub-issues
-	fmt.Printf("Checking for existing sub-issues and creating new ones for issue #%d...\n", issueNum)
+	// Create or preview sub-issues
+	if splitDryRun {
+		fmt.Printf("🔍 DRY-RUN: Previewing sub-issues that would be created for issue #%d...\n\n", issueNum)
+	} else {
+		fmt.Printf("Checking for existing sub-issues and creating new ones for issue #%d...\n", issueNum)
+	}
 	
 	client := issue.NewClient()
 	parentIssue, err := client.GetIssueWithRepo(issueNum, splitRepo)
@@ -193,37 +199,101 @@ func runSplit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Get existing sub-issues to avoid duplicates
-	existingSubIssues, err := getExistingSubIssues(issueNum, splitRepo)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to get existing sub-issues: %v\n", err)
-		// Continue anyway, but might create duplicates
-	}
-	
-	if len(existingSubIssues) > 0 {
-		fmt.Printf("Found %d existing sub-issues for issue #%d\n", len(existingSubIssues), issueNum)
+	var existingSubIssues []SubIssueInfo
+	if !splitDryRun {
+		existingSubIssues, err = getExistingSubIssues(issueNum, splitRepo)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to get existing sub-issues: %v\n", err)
+			// Continue anyway, but might create duplicates
+		}
+		
+		if len(existingSubIssues) > 0 {
+			fmt.Printf("Found %d existing sub-issues for issue #%d\n", len(existingSubIssues), issueNum)
+		}
 	}
 
 	createdIssues := []issue.Issue{}
 	skippedCount := 0
-	for i, task := range tasks {
-		// Check if this task already exists as a sub-issue
-		if isTaskAlreadySubIssue(task, existingSubIssues) {
-			fmt.Printf("⏭️  Skipping (already exists): %s\n", task)
-			skippedCount++
-			continue
+	wouldCreateCount := 0
+	
+	if splitDryRun {
+		// Dry-run mode: show what would be created
+		fmt.Println("Parent Issue:")
+		fmt.Printf("  #%d: %s\n", parentIssue.Number, parentIssue.Title)
+		if len(parentIssue.Labels) > 0 {
+			fmt.Print("  Labels: ")
+			for i, label := range parentIssue.Labels {
+				if i > 0 {
+					fmt.Print(", ")
+				}
+				fmt.Print(label.Name)
+			}
+			fmt.Println()
+		}
+		if len(parentIssue.Assignees) > 0 {
+			fmt.Printf("  Assignees: %s\n", strings.Join(parentIssue.Assignees, ", "))
+		}
+		if parentIssue.Milestone != "" {
+			fmt.Printf("  Milestone: %s\n", parentIssue.Milestone)
+		}
+		fmt.Println("\nSub-issues that would be created:")
+		fmt.Println("─────────────────────────────────")
+		
+		for _, task := range tasks {
+			wouldCreateCount++
+			fmt.Printf("  %d. %s\n", wouldCreateCount, task)
+			
+			// Show what would be inherited
+			inheritedItems := []string{}
+			if len(parentIssue.Labels) > 0 {
+				labelCount := 0
+				for _, label := range parentIssue.Labels {
+					if label.Name != "epic" && label.Name != "parent" && label.Name != "sub-task" {
+						labelCount++
+					}
+				}
+				if labelCount > 0 {
+					inheritedItems = append(inheritedItems, fmt.Sprintf("%d labels", labelCount))
+				}
+			}
+			if len(parentIssue.Assignees) > 0 {
+				inheritedItems = append(inheritedItems, fmt.Sprintf("%d assignees", len(parentIssue.Assignees)))
+			}
+			if parentIssue.Milestone != "" {
+				inheritedItems = append(inheritedItems, "milestone")
+			}
+			
+			if len(inheritedItems) > 0 {
+				fmt.Printf("     → Inherits: %s\n", strings.Join(inheritedItems, ", "))
+			}
 		}
 		
-		subIssue, err := createSubIssue(client, parentIssue, task, i+1, splitRepo)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to create sub-issue for task '%s': %v\n", task, err)
-			continue
+		fmt.Println("\n─────────────────────────────────")
+		fmt.Printf("Total: %d sub-issues would be created\n", wouldCreateCount)
+		fmt.Println("\nTo actually create these sub-issues, run without --dry-run")
+		
+	} else {
+		// Normal mode: actually create sub-issues
+		for i, task := range tasks {
+			// Check if this task already exists as a sub-issue
+			if isTaskAlreadySubIssue(task, existingSubIssues) {
+				fmt.Printf("⏭️  Skipping (already exists): %s\n", task)
+				skippedCount++
+				continue
+			}
+			
+			subIssue, err := createSubIssue(client, parentIssue, task, i+1, splitRepo)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to create sub-issue for task '%s': %v\n", task, err)
+				continue
+			}
+			createdIssues = append(createdIssues, subIssue)
+			fmt.Printf("✓ Created sub-issue #%d: %s\n", subIssue.Number, subIssue.Title)
 		}
-		createdIssues = append(createdIssues, subIssue)
-		fmt.Printf("✓ Created sub-issue #%d: %s\n", subIssue.Number, subIssue.Title)
-	}
-	
-	if skippedCount > 0 {
-		fmt.Printf("\nSkipped %d tasks that already have sub-issues\n", skippedCount)
+		
+		if skippedCount > 0 {
+			fmt.Printf("\nSkipped %d tasks that already have sub-issues\n", skippedCount)
+		}
 	}
 
 	// Optional: Update parent issue body with sub-issue links
@@ -238,7 +308,12 @@ func runSplit(cmd *cobra.Command, args []string) error {
 	}
 	*/
 
-	// Output summary
+	// Output summary (skip for dry-run in non-JSON format)
+	if splitDryRun && outputFormat != "json" {
+		// Already printed detailed preview above
+		return nil
+	}
+	
 	var formatType output.FormatType
 	switch outputFormat {
 	case "json":
@@ -254,13 +329,25 @@ func runSplit(cmd *cobra.Command, args []string) error {
 	}
 	
 	formatter := output.NewFormatter(formatType)
-	summary := map[string]interface{}{
-		"parent_issue": issueNum,
-		"created_count": len(createdIssues),
-		"sub_issues": createdIssues,
-	}
 	
-	return formatter.Format(summary)
+	if splitDryRun {
+		// For dry-run JSON output
+		summary := map[string]interface{}{
+			"dry_run": true,
+			"parent_issue": issueNum,
+			"would_create_count": wouldCreateCount,
+			"tasks": tasks,
+		}
+		return formatter.Format(summary)
+	} else {
+		// Normal output
+		summary := map[string]interface{}{
+			"parent_issue": issueNum,
+			"created_count": len(createdIssues),
+			"sub_issues": createdIssues,
+		}
+		return formatter.Format(summary)
+	}
 }
 
 func extractTasksFromIssueBody(issueNum int, repo string) ([]string, error) {
