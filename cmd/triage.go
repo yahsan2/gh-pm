@@ -56,6 +56,14 @@ type GitHubIssue struct {
 	URL    string `json:"html_url"`
 }
 
+// IssueUpdate holds the updates to be applied to an issue
+type IssueUpdate struct {
+	Issue          GitHubIssue
+	ItemID         string
+	StatusChoice   *string // nil means skip
+	EstimateChoice *string // nil means skip
+}
+
 func runTriage(cmd *cobra.Command, args []string) error {
 	triageName := args[0]
 	
@@ -126,7 +134,8 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 	
 	// Display instruction if configured
 	if triageConfig.Instruction != "" {
-		fmt.Printf("\n%s\n\n", triageConfig.Instruction)
+		// Use dim cyan for instruction
+		fmt.Printf("\n\033[36m%s\033[0m\n\n", triageConfig.Instruction)
 	}
 	
 	// Get project ID if needed for field updates or interactive features
@@ -196,52 +205,104 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 		}
 	}
 	
-	// Apply changes to each issue
-	for _, issue := range issues {
-		fmt.Printf("Processing issue #%d: %s\n", issue.Number, issue.Title)
+	// Phase 1: Collect all interactive choices first
+	updates := make([]IssueUpdate, 0, len(issues))
+	
+	if triageConfig.Interactive.Status || triageConfig.Interactive.Estimate {
+		fmt.Println("\n=== Interactive Selection Phase ===")
+		reader := bufio.NewReader(os.Stdin)
+		
+		for _, issue := range issues {
+			update := IssueUpdate{Issue: issue}
+			
+			// Get project item ID if needed
+			if projectID != "" {
+				itemID, _, err := c.issueAPI.AddToProjectWithDatabaseID(issue.ID, projectID)
+				if err != nil {
+					fmt.Printf("Warning: failed to add issue #%d to project: %v\n", issue.Number, err)
+					continue
+				}
+				update.ItemID = itemID
+			}
+			
+			// Collect interactive status choice
+			if triageConfig.Interactive.Status && update.ItemID != "" {
+				statusChoice := c.collectStatusChoice(issue, reader, fields)
+				update.StatusChoice = statusChoice
+			}
+			
+			// Collect interactive estimate choice
+			if triageConfig.Interactive.Estimate {
+				estimateChoice := c.collectEstimateChoice(issue, reader)
+				update.EstimateChoice = estimateChoice
+			}
+			
+			updates = append(updates, update)
+		}
+		
+		fmt.Println("\n=== Applying Updates ===")
+	} else {
+		// No interactive fields, just prepare updates
+		for _, issue := range issues {
+			update := IssueUpdate{Issue: issue}
+			
+			if projectID != "" {
+				itemID, _, err := c.issueAPI.AddToProjectWithDatabaseID(issue.ID, projectID)
+				if err != nil {
+					fmt.Printf("Warning: failed to add issue #%d to project: %v\n", issue.Number, err)
+					continue
+				}
+				update.ItemID = itemID
+			}
+			
+			updates = append(updates, update)
+		}
+	}
+	
+	// Phase 2: Apply all changes
+	for _, update := range updates {
+		fmt.Printf("Processing issue #%d: %s\n", update.Issue.Number, update.Issue.Title)
 		
 		// Apply labels
 		if len(triageConfig.Apply.Labels) > 0 {
-			if err := c.applyLabels(issue.Number, triageConfig.Apply.Labels); err != nil {
-				fmt.Printf("Warning: failed to apply labels to issue #%d: %v\n", issue.Number, err)
+			if err := c.applyLabels(update.Issue.Number, triageConfig.Apply.Labels); err != nil {
+				fmt.Printf("Warning: failed to apply labels to issue #%d: %v\n", update.Issue.Number, err)
 			}
 		}
 		
-		// Apply project field updates if issue is in project
-		if projectID != "" {
-			// Try to add issue to project (if already exists, this will return existing item)
-			itemID, _, err := c.issueAPI.AddToProjectWithDatabaseID(issue.ID, projectID)
-			if err != nil {
-				fmt.Printf("Warning: failed to add issue #%d to project: %v\n", issue.Number, err)
-				continue
-			}
-			
-			if itemID != "" {
-				// Update fields based on configuration (non-interactive)
-				for fieldKey, fieldValue := range triageConfig.Apply.Fields {
-					var fieldName string
-					switch fieldKey {
-					case "status":
-						fieldName = "Status"
-					case "priority":
-						fieldName = "Priority"
-					default:
-						fieldName = fieldKey // Use as-is for other fields
-					}
-					
-					if err := c.updateProjectField(projectID, itemID, fieldName, fieldValue, fields); err != nil {
-						fmt.Printf("Warning: failed to update %s field for issue #%d: %v\n", fieldName, issue.Number, err)
-					}
+		// Apply project field updates
+		if projectID != "" && update.ItemID != "" {
+			// Apply configuration fields
+			for fieldKey, fieldValue := range triageConfig.Apply.Fields {
+				var fieldName string
+				switch fieldKey {
+				case "status":
+					fieldName = "Status"
+				case "priority":
+					fieldName = "Priority"
+				default:
+					fieldName = fieldKey
 				}
 				
-				// Handle interactive fields (always check, even if no apply fields)
-				if err := c.handleInteractiveFields(projectID, itemID, issue, triageConfig.Interactive, fields); err != nil {
-					fmt.Printf("Warning: failed to handle interactive fields for issue #%d: %v\n", issue.Number, err)
+				if err := c.updateProjectField(projectID, update.ItemID, fieldName, fieldValue, fields); err != nil {
+					fmt.Printf("Warning: failed to update %s field for issue #%d: %v\n", fieldName, update.Issue.Number, err)
 				}
 			}
-		} else if triageConfig.Interactive.Status || triageConfig.Interactive.Estimate {
-			// Handle interactive fields even without project fields (for estimate triage)
-			fmt.Printf("No project configured, skipping interactive field updates for issue #%d\n", issue.Number)
+			
+			// Apply interactive status choice
+			if update.StatusChoice != nil {
+				if err := c.updateProjectField(projectID, update.ItemID, "Status", *update.StatusChoice, fields); err != nil {
+					fmt.Printf("Warning: failed to update status for issue #%d: %v\n", update.Issue.Number, err)
+				} else {
+					fmt.Printf("✓ Updated status to '%s' for issue #%d\n", *update.StatusChoice, update.Issue.Number)
+				}
+			}
+			
+			// Apply interactive estimate choice
+			if update.EstimateChoice != nil {
+				// TODO: Implement estimate field update
+				fmt.Printf("✓ Set estimate '%s' for issue #%d (estimate field update not fully implemented)\n", *update.EstimateChoice, update.Issue.Number)
+			}
 		}
 	}
 	
@@ -439,27 +500,7 @@ func (c *TriageCommand) updateProjectField(projectID, itemID, fieldName, value s
 	return fmt.Errorf("unsupported field type '%s' for field '%s'", targetField.DataType, fieldName)
 }
 
-func (c *TriageCommand) handleInteractiveFields(projectID, itemID string, issue GitHubIssue, interactive config.TriageInteractive, fields []project.Field) error {
-	reader := bufio.NewReader(os.Stdin)
-	
-	// Handle status field interactively
-	if interactive.Status {
-		if err := c.handleInteractiveStatus(projectID, itemID, issue, reader, fields); err != nil {
-			return err
-		}
-	}
-	
-	// Handle estimate field interactively
-	if interactive.Estimate {
-		if err := c.handleInteractiveEstimate(projectID, itemID, issue, reader); err != nil {
-			return err
-		}
-	}
-	
-	return nil
-}
-
-func (c *TriageCommand) handleInteractiveStatus(projectID, itemID string, issue GitHubIssue, reader *bufio.Reader, fields []project.Field) error {
+func (c *TriageCommand) collectStatusChoice(issue GitHubIssue, reader *bufio.Reader, fields []project.Field) *string {
 	// Find Status field
 	var statusField *project.Field
 	for _, field := range fields {
@@ -470,7 +511,8 @@ func (c *TriageCommand) handleInteractiveStatus(projectID, itemID string, issue 
 	}
 	
 	if statusField == nil {
-		return fmt.Errorf("Status field not found in project")
+		fmt.Printf("Status field not found in project for issue #%d\n", issue.Number)
+		return nil
 	}
 	
 	fmt.Printf("\nSelect status for issue #%d: %s\n", issue.Number, issue.Title)
@@ -506,7 +548,8 @@ func (c *TriageCommand) handleInteractiveStatus(projectID, itemID string, issue 
 	fmt.Print("Enter your choice (0-" + strconv.Itoa(len(availableOptions)) + "): ")
 	input, err := reader.ReadString('\n')
 	if err != nil {
-		return fmt.Errorf("failed to read input: %w", err)
+		fmt.Printf("Failed to read input: %v\n", err)
+		return nil
 	}
 	
 	input = strings.TrimSpace(input)
@@ -522,21 +565,17 @@ func (c *TriageCommand) handleInteractiveStatus(projectID, itemID string, issue 
 	}
 	
 	selectedStatus := availableOptions[choice-1]
-	if err := c.updateProjectField(projectID, itemID, "Status", selectedStatus, fields); err != nil {
-		return fmt.Errorf("failed to update status: %w", err)
-	}
-	
-	fmt.Printf("✓ Updated status to '%s' for issue #%d\n", selectedStatus, issue.Number)
-	return nil
+	return &selectedStatus
 }
 
-func (c *TriageCommand) handleInteractiveEstimate(projectID, itemID string, issue GitHubIssue, reader *bufio.Reader) error {
+func (c *TriageCommand) collectEstimateChoice(issue GitHubIssue, reader *bufio.Reader) *string {
 	fmt.Printf("\nEnter estimate for issue #%d: %s\n", issue.Number, issue.Title)
 	fmt.Print("Estimate (e.g., '2h', '1d', '3pts', or press Enter to skip): ")
 	
 	input, err := reader.ReadString('\n')
 	if err != nil {
-		return fmt.Errorf("failed to read input: %w", err)
+		fmt.Printf("Failed to read input: %v\n", err)
+		return nil
 	}
 	
 	input = strings.TrimSpace(input)
@@ -545,11 +584,9 @@ func (c *TriageCommand) handleInteractiveEstimate(projectID, itemID string, issu
 		return nil
 	}
 	
-	// Here you would implement the estimate field update logic
-	// This is a placeholder since estimate field implementation depends on your project setup
-	fmt.Printf("✓ Set estimate '%s' for issue #%d (estimate field update not fully implemented)\n", input, issue.Number)
-	return nil
+	return &input
 }
+
 
 func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]string, labelExcludes []string) ([]GitHubIssue, error) {
 	projectID := c.config.Metadata.Project.ID
@@ -734,7 +771,8 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 func (c *TriageCommand) displayIssuesList(issues []GitHubIssue, triageConfig config.TriageConfig) error {
 	// Display instruction if configured
 	if triageConfig.Instruction != "" {
-		fmt.Printf("%s\n\n", triageConfig.Instruction)
+		// Use dim cyan for instruction
+		fmt.Printf("\033[36m%s\033[0m\n\n", triageConfig.Instruction)
 	}
 	
 	// Display issues that would be affected
