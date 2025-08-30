@@ -249,6 +249,13 @@ gh pm triage estimate --dry-run  # Same as --list
 
 # Interactive triage (prompts for each issue)
 gh pm triage estimate  # If configured with interactive fields
+
+# Ad-hoc triage with query and apply (without configuration file)
+gh pm triage --query="Status:backlog -has:estimate" --apply="status:in-progress"
+
+# Ad-hoc triage with interactive mode for specific fields
+gh pm triage --query="Status:backlog" --interactive="status,estimate"
+gh pm triage --query="-has:priority" --interactive="priority"
 ```
 
 **Triage Configuration Example (.gh-pm.yml):**
@@ -283,6 +290,35 @@ triage:
 - `apply.fields`: Project field values to automatically set
 - `interactive.status`: Prompt for status selection for each issue
 - `interactive.estimate`: Prompt for estimate entry for each issue
+
+**Query Syntax Extensions:**
+
+gh-pm extends GitHub's standard search syntax with project-specific filters:
+
+- **Field filters**: `Status:backlog`, `Priority:critical` - Filter by project field values
+- **Field exclusion** (gh-pm exclusive): `-has:estimate` - Find issues missing a field value
+- **Label exclusion**: `-label:bug` - Exclude issues with specific labels
+- **Combined queries**: `Status:backlog -has:estimate -label:blocked`
+
+Note: The `-has:` operator is a gh-pm extension not available in standard GitHub search. It uses GraphQL to filter issues missing specific project field values.
+
+**Interactive Field Support:**
+
+When using `--interactive`, the following field types are currently supported:
+- `SINGLE_SELECT` - Select from predefined options (e.g., Status, Priority)
+- `TEXT` - Free-form text input (e.g., custom text fields)
+- `NUMBER` - Numeric values (e.g., story points, hours)
+
+**Planned Support (In Development):**
+The following field types are planned for future releases:
+- `ITERATION` - Select project iterations ([#29](https://github.com/yahsan2/gh-pm/issues/29))
+- `DATE` - Date picker with format validation ([#30](https://github.com/yahsan2/gh-pm/issues/30))
+- `MILESTONE` - Select repository milestones ([#31](https://github.com/yahsan2/gh-pm/issues/31))
+- `ASSIGNEES` - Assign users to issues ([#32](https://github.com/yahsan2/gh-pm/issues/32))
+- `LABELS` - Add/remove issue labels ([#33](https://github.com/yahsan2/gh-pm/issues/33))
+
+Not planned for interactive mode:
+- `REPOSITORY`, `LINKED_PULL_REQUESTS` - These are read-only fields
 
 ### Priority Management
 

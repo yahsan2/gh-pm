@@ -18,10 +18,10 @@ import (
 var triageCmd = &cobra.Command{
 	Use:   "triage [triage-name]",
 	Short: "Execute a triage configuration to update issues based on query",
-	Long: `Execute a predefined triage configuration from .gh-pm.yml.
+	Long: `Execute a predefined triage configuration from .gh-pm.yml or run ad-hoc triage.
 	
 This command will:
-- Execute the GitHub search query defined in the triage configuration
+- Execute the GitHub search query defined in the triage configuration or provided via --query
 - Apply labels, status, and priority updates to matching issues
 - Update project fields for issues that are part of the configured project`,
 	Example: `  # Run the hogehoge triage configuration
@@ -31,14 +31,24 @@ This command will:
   gh pm triage hogehoge --list
   
   # Same as --list (dry-run mode)
-  gh pm triage hogehoge --dry-run`,
-	Args: cobra.ExactArgs(1),
+  gh pm triage hogehoge --dry-run
+  
+  # Ad-hoc triage with query and apply
+  gh pm triage --query="Status:backlog -has:estimate" --apply="status:in-progress"
+  
+  # Ad-hoc triage with interactive mode for specific fields
+  gh pm triage --query="Status:backlog" --interactive="status,estimate"
+  gh pm triage --query="-has:priority" --interactive="priority"`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: runTriage,
 }
 
 func init() {
 	triageCmd.Flags().BoolP("list", "l", false, "List matching issues without applying changes")
 	triageCmd.Flags().Bool("dry-run", false, "Show what would be changed without making changes (alias for --list)")
+	triageCmd.Flags().String("query", "", "Query to filter issues (required when not using a named configuration)")
+	triageCmd.Flags().StringSlice("apply", []string{}, "Fields to apply (e.g., 'status:in-progress', 'label:bug')")
+	triageCmd.Flags().StringSlice("interactive", []string{}, "Fields to prompt for interactively (e.g., 'status', 'estimate', 'priority')")
 	rootCmd.AddCommand(triageCmd)
 }
 
@@ -60,16 +70,18 @@ type GitHubIssue struct {
 type IssueUpdate struct {
 	Issue          GitHubIssue
 	ItemID         string
-	StatusChoice   *string // nil means skip
-	EstimateChoice *string // nil means skip
+	StatusChoice   *string           // nil means skip
+	EstimateChoice *string           // nil means skip
+	FieldChoices   map[string]string // field name -> selected value
 }
 
 func runTriage(cmd *cobra.Command, args []string) error {
-	triageName := args[0]
-	
 	// Parse flags
 	listOnly, _ := cmd.Flags().GetBool("list")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	queryFlag, _ := cmd.Flags().GetString("query")
+	applyFlags, _ := cmd.Flags().GetStringSlice("apply")
+	interactiveFields, _ := cmd.Flags().GetStringSlice("interactive")
 	
 	// If either --list or --dry-run is specified, enable list-only mode
 	if dryRun {
@@ -82,10 +94,65 @@ func runTriage(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w\nRun 'gh pm init' to create a configuration file", err)
 	}
 	
-	// Get triage configuration
-	triageConfig, exists := cfg.Triage[triageName]
-	if !exists {
-		return fmt.Errorf("triage configuration '%s' not found in .gh-pm.yml", triageName)
+	var triageConfig config.TriageConfig
+	
+	// Check if using ad-hoc mode or named configuration
+	if queryFlag != "" {
+		// Ad-hoc mode: --query is required, --apply or --interactive is required
+		if len(applyFlags) == 0 && len(interactiveFields) == 0 {
+			return fmt.Errorf("--query requires either --apply or --interactive flag")
+		}
+		
+		// Build triage config from flags
+		triageConfig = config.TriageConfig{
+			Query: queryFlag,
+			Apply: config.TriageApply{
+				Fields: make(map[string]string),
+				Labels: []string{},
+			},
+			Interactive: config.TriageInteractive{},
+			InteractiveFields: make(map[string]bool),
+		}
+		
+		// Parse apply flags
+		for _, apply := range applyFlags {
+			parts := strings.SplitN(apply, ":", 2)
+			if len(parts) != 2 {
+				return fmt.Errorf("invalid apply format: %s (expected 'field:value')", apply)
+			}
+			field := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			
+			if field == "label" {
+				triageConfig.Apply.Labels = append(triageConfig.Apply.Labels, value)
+			} else {
+				triageConfig.Apply.Fields[field] = value
+			}
+		}
+		
+		// Set interactive fields
+		for _, field := range interactiveFields {
+			field = strings.ToLower(strings.TrimSpace(field))
+			// For backward compatibility, handle status and estimate specially
+			if field == "status" {
+				triageConfig.Interactive.Status = true
+			} else if field == "estimate" {
+				triageConfig.Interactive.Estimate = true
+			} else {
+				// Store other fields in the new map
+				triageConfig.InteractiveFields[field] = true
+			}
+		}
+	} else if len(args) > 0 {
+		// Named configuration mode
+		triageName := args[0]
+		var exists bool
+		triageConfig, exists = cfg.Triage[triageName]
+		if !exists {
+			return fmt.Errorf("triage configuration '%s' not found in .gh-pm.yml", triageName)
+		}
+	} else {
+		return fmt.Errorf("either provide a triage name or use --query with --apply/--interactive")
 	}
 	
 	// Create clients
@@ -140,7 +207,7 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 	
 	// Get project ID if needed for field updates or interactive features
 	var projectID string
-	if len(triageConfig.Apply.Fields) > 0 || triageConfig.Interactive.Status || triageConfig.Interactive.Estimate {
+	if len(triageConfig.Apply.Fields) > 0 || triageConfig.Interactive.Status || triageConfig.Interactive.Estimate || len(triageConfig.InteractiveFields) > 0 {
 		if c.config.Project.Name != "" || c.config.Project.Number > 0 {
 			projectID = c.config.GetProjectID()
 			if projectID == "" {
@@ -173,7 +240,7 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 	
 	// Get project fields if we need to update them or handle interactive features
 	var fields []project.Field
-	if projectID != "" && (len(triageConfig.Apply.Fields) > 0 || triageConfig.Interactive.Status || triageConfig.Interactive.Estimate) {
+	if projectID != "" && (len(triageConfig.Apply.Fields) > 0 || triageConfig.Interactive.Status || triageConfig.Interactive.Estimate || len(triageConfig.InteractiveFields) > 0) {
 		// Try to use cached fields first
 		if c.config.HasCachedFields() {
 			// Convert cached fields to project.Field format
@@ -205,10 +272,40 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 		}
 	}
 	
+	// Validate interactive fields are supported
+	if len(triageConfig.InteractiveFields) > 0 && len(fields) > 0 {
+		unsupportedFields := []string{}
+		for fieldName := range triageConfig.InteractiveFields {
+			var fieldFound bool
+			for _, field := range fields {
+				if strings.EqualFold(field.Name, fieldName) {
+					fieldFound = true
+					// Check if field type is supported
+					if field.DataType != "SINGLE_SELECT" && field.DataType != "TEXT" && field.DataType != "NUMBER" {
+						unsupportedFields = append(unsupportedFields, fmt.Sprintf("%s (%s)", fieldName, field.DataType))
+					}
+					break
+				}
+			}
+			if !fieldFound {
+				unsupportedFields = append(unsupportedFields, fmt.Sprintf("%s (not found)", fieldName))
+			}
+		}
+		
+		if len(unsupportedFields) > 0 {
+			fmt.Printf("\nWarning: The following fields cannot be used interactively:\n")
+			for _, field := range unsupportedFields {
+				fmt.Printf("  - %s\n", field)
+			}
+			fmt.Printf("\nCurrently supported field types: SINGLE_SELECT, TEXT, NUMBER\n\n")
+		}
+	}
+	
 	// Phase 1: Collect all interactive choices first
 	updates := make([]IssueUpdate, 0, len(issues))
 	
-	if triageConfig.Interactive.Status || triageConfig.Interactive.Estimate {
+	hasInteractive := triageConfig.Interactive.Status || triageConfig.Interactive.Estimate || len(triageConfig.InteractiveFields) > 0
+	if hasInteractive {
 		fmt.Println("\n=== Interactive Selection Phase ===")
 		reader := bufio.NewReader(os.Stdin)
 		
@@ -235,6 +332,19 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 			if triageConfig.Interactive.Estimate {
 				estimateChoice := c.collectEstimateChoice(issue, reader)
 				update.EstimateChoice = estimateChoice
+			}
+			
+			// Collect other interactive fields
+			if len(triageConfig.InteractiveFields) > 0 && update.ItemID != "" {
+				if update.FieldChoices == nil {
+					update.FieldChoices = make(map[string]string)
+				}
+				for fieldName := range triageConfig.InteractiveFields {
+					choice := c.collectFieldChoice(issue, reader, fieldName, fields)
+					if choice != nil {
+						update.FieldChoices[fieldName] = *choice
+					}
+				}
 			}
 			
 			updates = append(updates, update)
@@ -304,6 +414,17 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 						fmt.Printf("Warning: failed to update estimate for issue #%d: %v\n", update.Issue.Number, err)
 					} else {
 						fmt.Printf("✓ Set estimate '%s' for issue #%d\n", *update.EstimateChoice, update.Issue.Number)
+					}
+				}
+				
+				// Apply other interactive field choices
+				for fieldName, fieldValue := range update.FieldChoices {
+					// Capitalize field name for consistency
+					displayFieldName := strings.Title(fieldName)
+					if err := c.updateProjectField(projectID, update.ItemID, displayFieldName, fieldValue, fields); err != nil {
+						fmt.Printf("Warning: failed to update %s for issue #%d: %v\n", fieldName, update.Issue.Number, err)
+					} else {
+						fmt.Printf("✓ Updated %s to '%s' for issue #%d\n", fieldName, fieldValue, update.Issue.Number)
 					}
 				}
 		}
@@ -704,6 +825,101 @@ func (c *TriageCommand) collectEstimateChoice(issue GitHubIssue, reader *bufio.R
 	return &input
 }
 
+func (c *TriageCommand) collectFieldChoice(issue GitHubIssue, reader *bufio.Reader, fieldName string, fields []project.Field) *string {
+	// Find the target field
+	var targetField *project.Field
+	for _, field := range fields {
+		if strings.EqualFold(field.Name, fieldName) {
+			targetField = &field
+			break
+		}
+	}
+	
+	if targetField == nil {
+		fmt.Printf("Field '%s' not found in project for issue #%d\n", fieldName, issue.Number)
+		return nil
+	}
+	
+	fmt.Printf("\nSelect %s for issue #%d: %s\n", fieldName, issue.Number, issue.Title)
+	
+	// Handle different field types
+	switch targetField.DataType {
+	case "SINGLE_SELECT":
+		// Get available options
+		var availableOptions []string
+		var configMapping map[string]string
+		
+		// Check if there's a config mapping for this field
+		if fieldConfig, ok := c.config.Fields[strings.ToLower(fieldName)]; ok {
+			configMapping = fieldConfig.Values
+			for key := range configMapping {
+				availableOptions = append(availableOptions, key)
+			}
+		} else {
+			// Use field options directly
+			for _, option := range targetField.Options {
+				availableOptions = append(availableOptions, option.Name)
+			}
+		}
+		
+		// Show options
+		for i, option := range availableOptions {
+			displayName := option
+			if configMapping != nil {
+				if mapped, ok := configMapping[option]; ok {
+					displayName = fmt.Sprintf("%s (%s)", option, mapped)
+				}
+			}
+			fmt.Printf("  %d. %s\n", i+1, displayName)
+		}
+		fmt.Printf("  0. Skip\n")
+		
+		fmt.Print("Enter your choice (0-" + strconv.Itoa(len(availableOptions)) + "): ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Printf("Failed to read input: %v\n", err)
+			return nil
+		}
+		
+		input = strings.TrimSpace(input)
+		choice, err := strconv.Atoi(input)
+		if err != nil || choice < 0 || choice > len(availableOptions) {
+			fmt.Printf("Invalid choice, skipping %s update for issue #%d\n", fieldName, issue.Number)
+			return nil
+		}
+		
+		if choice == 0 {
+			fmt.Printf("Skipped %s update for issue #%d\n", fieldName, issue.Number)
+			return nil
+		}
+		
+		selectedValue := availableOptions[choice-1]
+		return &selectedValue
+		
+	case "TEXT", "NUMBER":
+		// For text or number fields, accept free-form input
+		fmt.Printf("Enter %s value (or press Enter to skip): ", fieldName)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Printf("Failed to read input: %v\n", err)
+			return nil
+		}
+		
+		input = strings.TrimSpace(input)
+		if input == "" {
+			fmt.Printf("Skipped %s for issue #%d\n", fieldName, issue.Number)
+			return nil
+		}
+		
+		return &input
+		
+	default:
+		fmt.Printf("Field '%s' has type '%s' which is not yet supported for interactive mode\n", fieldName, targetField.DataType)
+		fmt.Printf("Currently supported types: SINGLE_SELECT, TEXT, NUMBER\n")
+		return nil
+	}
+}
+
 
 func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]string, fieldExcludes map[string]bool, labelExcludes []string) ([]GitHubIssue, error) {
 	projectID := c.config.Metadata.Project.ID
@@ -997,7 +1213,7 @@ func (c *TriageCommand) displayIssuesList(issues []GitHubIssue, triageConfig con
 	}
 	
 	// Show interactive options
-	if triageConfig.Interactive.Status || triageConfig.Interactive.Estimate {
+	if triageConfig.Interactive.Status || triageConfig.Interactive.Estimate || len(triageConfig.InteractiveFields) > 0 {
 		fmt.Printf("- Interactive fields:\n")
 		if triageConfig.Interactive.Status {
 			fmt.Printf("  - Status (will prompt for each issue)\n")
@@ -1005,9 +1221,14 @@ func (c *TriageCommand) displayIssuesList(issues []GitHubIssue, triageConfig con
 		if triageConfig.Interactive.Estimate {
 			fmt.Printf("  - Estimate (will prompt for each issue)\n")
 		}
+		for fieldName := range triageConfig.InteractiveFields {
+			fmt.Printf("  - %s (will prompt for each issue)\n", strings.Title(fieldName))
+		}
 	}
 	
-	if len(triageConfig.Apply.Labels) == 0 && len(triageConfig.Apply.Fields) == 0 && !triageConfig.Interactive.Status && !triageConfig.Interactive.Estimate {
+	if len(triageConfig.Apply.Labels) == 0 && len(triageConfig.Apply.Fields) == 0 && 
+		!triageConfig.Interactive.Status && !triageConfig.Interactive.Estimate && 
+		len(triageConfig.InteractiveFields) == 0 {
 		fmt.Printf("- No changes configured\n")
 	}
 	

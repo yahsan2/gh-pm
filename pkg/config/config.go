@@ -44,10 +44,11 @@ type Field struct {
 
 // TriageConfig represents a triage configuration
 type TriageConfig struct {
-	Query       string            `yaml:"query"`
-	Instruction string            `yaml:"instruction,omitempty"`
-	Apply       TriageApply       `yaml:"apply"`
-	Interactive TriageInteractive `yaml:"interactive,omitempty"`
+	Query             string            `yaml:"query"`
+	Instruction       string            `yaml:"instruction,omitempty"`
+	Apply             TriageApply       `yaml:"apply"`
+	Interactive       TriageInteractive `yaml:"interactive,omitempty"`
+	InteractiveFields map[string]bool   `yaml:"-"` // Runtime only, not persisted
 }
 
 // TriageApply represents what to apply during triage
