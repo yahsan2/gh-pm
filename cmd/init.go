@@ -143,10 +143,6 @@ func runInit(cmd *cobra.Command, args []string) error {
 						initProject = selectedProject.Title
 						fmt.Printf("✓ Selected project: %s (#%d)\n", selectedProject.Title, selectedProject.Number)
 						
-						// After selecting project, configure field mappings if interactive
-						if initInteractive {
-							configureFieldMappings(cfg, selectedProject, client)
-						}
 					}
 				} else {
 					fmt.Println("No projects found.")
@@ -306,10 +302,6 @@ func runInit(cmd *cobra.Command, args []string) error {
 							}
 						}
 						
-						// Auto-configure field mappings in non-interactive mode
-						if !initInteractive {
-							autoConfigureFieldMappings(cfg, fields)
-						}
 					} else {
 						fmt.Println("\nNo custom fields found in the project.")
 					}
