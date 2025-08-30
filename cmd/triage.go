@@ -34,7 +34,7 @@ This command will:
   gh pm triage hogehoge --dry-run
   
   # Ad-hoc triage with query and apply
-  gh pm triage --query="status:backlog -has:estimate" --apply="status:in-progress"
+  gh pm triage --query="status:backlog -has:estimate" --apply="status:in_progress"
   
   # Ad-hoc triage with interactive mode for specific fields
   gh pm triage --query="status:backlog" --interactive="status,estimate"

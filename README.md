@@ -251,7 +251,7 @@ gh pm triage estimate --dry-run  # Same as --list
 gh pm triage estimate  # If configured with interactive fields
 
 # Ad-hoc triage with query and apply (without configuration file)
-gh pm triage --query="status:backlog -has:estimate" --apply="status:in-progress"
+gh pm triage --query="status:backlog -has:estimate" --apply="status:in_progress"
 
 # Ad-hoc triage with interactive mode for specific fields
 gh pm triage --query="status:backlog" --interactive="status,estimate"
