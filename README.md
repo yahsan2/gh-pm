@@ -61,9 +61,6 @@ gh pm init --skip-metadata
 
 ### Basic Workflow
 ```bash
-# List all issues in project
-gh pm list
-
 # Create a new issue with priority
 gh pm create --title "Implement authentication" --priority p1 --label "backend"
 
@@ -111,7 +108,7 @@ Detecting projects for repository yahsan2/gh-pm...
 
 Available projects from repository yahsan2/gh-pm:
 ----------------------------------------------------------------------
- 1. gh-pm project                            #8     
+ 1. gh-pm project                            #8
     URL: https://github.com/users/yahsan2/projects/8
 ----------------------------------------------------------------------
 
@@ -279,7 +276,7 @@ triage:
         status: backlog
     interactive:
       status: true  # Prompt for status selection
-  
+
   # Interactive estimation
   estimate:
     query: "is:issue is:open status:backlog -has:estimate"
@@ -404,7 +401,7 @@ fields:
       p0: "P0"          # Critical
       p1: "P1"          # High
       p2: "P2"          # Medium
-  
+
   status:
     field: "Status"
     values:
