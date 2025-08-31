@@ -433,4 +433,3 @@ func (c *Client) UpdateIssueWithRepo(number int, req IssueRequest, repo string) 
 
 	return nil
 }
-

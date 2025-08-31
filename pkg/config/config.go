@@ -394,4 +394,3 @@ func isValidRepository(repo string) bool {
 func FindConfigPath() string {
 	return findConfigFile()
 }
-

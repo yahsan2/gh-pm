@@ -167,4 +167,3 @@ func (d *IssueData) GetFieldUpdates() map[string]interface{} {
 
 	return fields
 }
-

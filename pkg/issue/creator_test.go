@@ -368,4 +368,3 @@ func TestIssueError_Is(t *testing.T) {
 	assert.False(t, err1.Is(err3))
 	assert.False(t, err1.Is(assert.AnError))
 }
-

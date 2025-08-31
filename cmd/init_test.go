@@ -10,8 +10,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yahsan2/gh-pm/pkg/config"
 	"gopkg.in/yaml.v3"
+
+	"github.com/yahsan2/gh-pm/pkg/config"
 )
 
 func TestInitCommand(t *testing.T) {
