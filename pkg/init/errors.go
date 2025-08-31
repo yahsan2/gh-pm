@@ -79,7 +79,7 @@ func HandleInitError(err error) {
 	if err == nil {
 		return
 	}
-	
+
 	switch e := err.(type) {
 	case *InitError:
 		switch e.Type {

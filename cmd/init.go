@@ -35,16 +35,16 @@ This command will:
 }
 
 var (
-	initProject      string
-	initOrg          string
-	initRepos        []string
-	initInteractive  bool
-	skipMetadata     bool
+	initProject     string
+	initOrg         string
+	initRepos       []string
+	initInteractive bool
+	skipMetadata    bool
 )
 
 func init() {
 	rootCmd.AddCommand(initCmd)
-	
+
 	initCmd.Flags().StringVar(&initProject, "project", "", "Project name or ID")
 	initCmd.Flags().StringVar(&initOrg, "org", "", "Organization name")
 	initCmd.Flags().StringSliceVar(&initRepos, "repo", []string{}, "Repositories (owner/repo format)")
@@ -55,18 +55,18 @@ func init() {
 func runInit(cmd *cobra.Command, args []string) error {
 	// Check if config already exists
 	var cfg *config.Config
-	
+
 	if config.Exists() {
 		fmt.Println("Configuration file .gh-pm.yml already exists in this directory or a parent directory.")
 		fmt.Print("Do you want to update it? (y/N): ")
-		
+
 		var response string
 		fmt.Scanln(&response)
 		if strings.ToLower(response) != "y" {
 			fmt.Println("Initialization cancelled.")
 			return nil
 		}
-		
+
 		// Load existing config
 		var err error
 		cfg, err = config.LoadConfig()
@@ -90,7 +90,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		} else {
 			cfg.Project.Org = initOrg
 		}
-		
+
 		// Add current repo to repositories if not already included
 		currentRepo := fmt.Sprintf("%s/%s", org, repo)
 		if !contains(initRepos, currentRepo) {
@@ -130,7 +130,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 						cfg.Project.Number = selectedProject.Number
 						initProject = selectedProject.Title
 						fmt.Printf("✓ Selected project: %s (#%d)\n", selectedProject.Title, selectedProject.Number)
-						
+
 					}
 				} else {
 					fmt.Println("No projects found.")
@@ -150,13 +150,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 		if repoErr == nil {
 			defaultName = repo
 		}
-		
+
 		if defaultName != "" {
 			fmt.Printf("Enter project name (default: %s, leave empty to skip): ", defaultName)
 		} else {
 			fmt.Print("Enter project name (leave empty to skip): ")
 		}
-		
+
 		scanner := bufio.NewScanner(os.Stdin)
 		if scanner.Scan() {
 			input := strings.TrimSpace(scanner.Text())
@@ -202,13 +202,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Always fetch to ensure we have the latest owner information
 	if cfg.Project.Name != "" || cfg.Project.Number > 0 {
 		fmt.Printf("Fetching project details from GitHub...\n")
-		
+
 		client, err := project.NewClient()
 		if err != nil {
 			fmt.Printf("Warning: Could not connect to GitHub: %v\n", err)
 		} else {
 			var proj *project.Project
-			
+
 			// Try as organization project first if org is specified
 			if cfg.Project.Org != "" {
 				// Use project number if available, otherwise use name
@@ -218,7 +218,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 					proj, err = client.GetProject(cfg.Project.Org, cfg.Project.Name, 0)
 				}
 			}
-			
+
 			// If failed or no org specified, try as user project
 			if proj == nil || err != nil {
 				// Extract owner from repository if available
@@ -229,7 +229,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 						owner = parts[0]
 					}
 				}
-				
+
 				// Try with owner as user
 				if owner != "" {
 					var userProj *project.Project
@@ -246,7 +246,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 						cfg.Project.Org = ""
 					}
 				}
-				
+
 				// If still no project, try current user
 				if proj == nil {
 					var userProj *project.Project
@@ -263,7 +263,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 					}
 				}
 			}
-			
+
 			if err != nil || proj == nil {
 				fmt.Printf("Warning: Could not fetch project details: %v\n", err)
 			} else {
@@ -274,7 +274,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 					fmt.Printf("✓ Updated project owner: %s\n", proj.Owner.Login)
 				}
 				fmt.Printf("✓ Found project: %s (#%d)\n", proj.Title, proj.Number)
-				
+
 				// Always fetch and cache ALL project fields
 				fields, err := client.GetProjectFields(proj.ID)
 				if err != nil {
@@ -289,11 +289,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 								fmt.Printf("    Options: %d available\n", len(field.Options))
 							}
 						}
-						
+
 					} else {
 						fmt.Println("\nNo custom fields found in the project.")
 					}
-					
+
 					// Always build and cache metadata (including all fields)
 					if !skipMetadata {
 						metadataManager := initpkg.NewMetadataManager(client)
@@ -303,7 +303,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 						} else {
 							cfg.Metadata = metadata
 							fmt.Printf("✓ Cached metadata for %d fields\n", len(fields))
-							
+
 							// Update fields configuration from metadata
 							updateFieldsFromMetadata(cfg, metadata)
 						}
@@ -324,7 +324,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Println("  1. Review and edit .gh-pm.yml to customize settings")
 	fmt.Println("  2. Run 'gh pm list' to view issues in your project")
 	fmt.Println("  3. Run 'gh pm create --title \"Your task\"' to create a new issue")
-	
+
 	return nil
 }
 
@@ -335,7 +335,7 @@ func getCurrentRepo() (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	
+
 	return repo.Owner, repo.Name, nil
 }
 
@@ -398,7 +398,7 @@ func updateFieldsFromMetadata(cfg *config.Config, metadata *config.ConfigMetadat
 	if cfg.Fields == nil {
 		cfg.Fields = make(map[string]config.Field)
 	}
-	
+
 	// Update Status field configuration from metadata
 	for _, field := range metadata.Fields {
 		if field.Name == "Status" && field.DataType == "SINGLE_SELECT" && len(field.Options) > 0 {
@@ -406,36 +406,36 @@ func updateFieldsFromMetadata(cfg *config.Config, metadata *config.ConfigMetadat
 				Field:  "Status",
 				Values: make(map[string]string),
 			}
-			
+
 			for _, opt := range field.Options {
 				// Create a normalized key for each option
 				key := strings.ToLower(opt.Name)
 				key = strings.ReplaceAll(key, " ", "_")
 				statusField.Values[key] = opt.Name
 			}
-			
+
 			cfg.Fields["status"] = statusField
 			fmt.Printf("✓ Updated status field configuration with %d values\n", len(field.Options))
 		}
-		
+
 		// Update Priority field configuration from metadata
 		if field.Name == "Priority" && field.DataType == "SINGLE_SELECT" && len(field.Options) > 0 {
 			priorityField := config.Field{
 				Field:  "Priority",
 				Values: make(map[string]string),
 			}
-			
+
 			for _, opt := range field.Options {
 				// For Priority, use the actual names (P0, P1, P2)
 				key := strings.ToLower(opt.Name)
 				priorityField.Values[key] = opt.Name
 			}
-			
+
 			cfg.Fields["priority"] = priorityField
 			fmt.Printf("✓ Updated priority field configuration with %d values\n", len(field.Options))
 		}
 	}
-	
+
 	// Update default values to match actual project values
 	if statusField, ok := cfg.Fields["status"]; ok {
 		// Set default status to "backlog" if it exists
@@ -445,7 +445,7 @@ func updateFieldsFromMetadata(cfg *config.Config, metadata *config.ConfigMetadat
 			cfg.Defaults.Status = "todo"
 		}
 	}
-	
+
 	if priorityField, ok := cfg.Fields["priority"]; ok {
 		// Set default priority to "p2" if it exists, otherwise keep "medium"
 		if _, hasP2 := priorityField.Values["p2"]; hasP2 {
@@ -480,7 +480,7 @@ func selectProjectWithDetails(projects []project.Project, source string) *projec
 	scanner := bufio.NewScanner(os.Stdin)
 	if scanner.Scan() {
 		input := strings.TrimSpace(scanner.Text())
-		
+
 		// Check if user wants to enter project number directly
 		if strings.ToLower(input) == "n" {
 			fmt.Print("Enter project number: ")
@@ -498,7 +498,7 @@ func selectProjectWithDetails(projects []project.Project, source string) *projec
 			}
 			return nil
 		}
-		
+
 		// Try to parse as selection number
 		choice, err := strconv.Atoi(input)
 		if err == nil && choice >= 0 && choice <= len(projects) {
@@ -507,7 +507,7 @@ func selectProjectWithDetails(projects []project.Project, source string) *projec
 			}
 			return &projects[choice-1]
 		}
-		
+
 		// Try to match by project name (partial match)
 		lowerInput := strings.ToLower(input)
 		for _, p := range projects {
@@ -538,17 +538,17 @@ func autoConfigureFieldMappings(cfg *config.Config, fields []project.Field) {
 				Field:  "Status",
 				Values: make(map[string]string),
 			}
-			
+
 			// Set the first status option as the default
 			firstOption := field.Options[0].Name
 			normalizedKey := strings.ToLower(strings.ReplaceAll(firstOption, " ", "_"))
 			cfg.Defaults.Status = normalizedKey
-			
+
 			// Map all status options using their normalized names as keys
 			for _, opt := range field.Options {
 				normalizedKey := strings.ToLower(strings.ReplaceAll(opt.Name, " ", "_"))
 				statusMapping.Values[normalizedKey] = opt.Name
-				
+
 				// Also add common aliases
 				lowerOpt := strings.ToLower(opt.Name)
 				if strings.Contains(lowerOpt, "todo") && normalizedKey != "todo" {
@@ -567,13 +567,13 @@ func autoConfigureFieldMappings(cfg *config.Config, fields []project.Field) {
 					statusMapping.Values["done"] = opt.Name
 				}
 			}
-			
+
 			cfg.Fields["status"] = statusMapping
 			fmt.Printf("✓ Auto-configured Status field mappings\n")
 			break
 		}
 	}
-	
+
 	// Look for Priority field
 	for _, field := range fields {
 		if strings.EqualFold(field.Name, "priority") && field.DataType == "SINGLE_SELECT" && len(field.Options) > 0 {
@@ -581,7 +581,7 @@ func autoConfigureFieldMappings(cfg *config.Config, fields []project.Field) {
 				Field:  "Priority",
 				Values: make(map[string]string),
 			}
-			
+
 			// Set default priority to middle option
 			middleIndex := len(field.Options) / 2
 			if middleIndex < len(field.Options) {
@@ -589,12 +589,12 @@ func autoConfigureFieldMappings(cfg *config.Config, fields []project.Field) {
 				normalizedKey := strings.ToLower(strings.ReplaceAll(defaultPriority, " ", "_"))
 				cfg.Defaults.Priority = normalizedKey
 			}
-			
+
 			// Map all priority options using their normalized names as keys
 			for _, opt := range field.Options {
 				normalizedKey := strings.ToLower(strings.ReplaceAll(opt.Name, " ", "_"))
 				priorityMapping.Values[normalizedKey] = opt.Name
-				
+
 				// Also add common aliases
 				lowerOpt := strings.ToLower(opt.Name)
 				if (strings.Contains(lowerOpt, "p0") || strings.Contains(lowerOpt, "critical")) && normalizedKey != "critical" {
@@ -610,7 +610,7 @@ func autoConfigureFieldMappings(cfg *config.Config, fields []project.Field) {
 					priorityMapping.Values["low"] = opt.Name
 				}
 			}
-			
+
 			cfg.Fields["priority"] = priorityMapping
 			fmt.Printf("✓ Auto-configured Priority field mappings\n")
 			break
@@ -620,18 +620,18 @@ func autoConfigureFieldMappings(cfg *config.Config, fields []project.Field) {
 
 func configureFieldMappings(cfg *config.Config, proj *project.Project, client *project.Client) {
 	fmt.Println("\nFetching project fields...")
-	
+
 	fields, err := client.GetProjectFields(proj.ID)
 	if err != nil {
 		fmt.Printf("Warning: Could not fetch project fields: %v\n", err)
 		return
 	}
-	
+
 	if len(fields) == 0 {
 		fmt.Println("No custom fields found in the project.")
 		return
 	}
-	
+
 	// Always build and cache metadata (including all fields)
 	if !skipMetadata {
 		metadataManager := initpkg.NewMetadataManager(client)
@@ -643,7 +643,7 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 			fmt.Printf("✓ Project metadata captured with %d fields for faster operations\n", len(fields))
 		}
 	}
-	
+
 	// Look for Status field
 	var statusField *project.Field
 	for _, field := range fields {
@@ -652,19 +652,19 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 			break
 		}
 	}
-	
+
 	if statusField != nil && len(statusField.Options) > 0 {
 		fmt.Println("\nFound Status field with the following options:")
 		for i, opt := range statusField.Options {
 			fmt.Printf("  %d. %s\n", i+1, opt.Name)
 		}
-		
+
 		// Always update status field mappings based on actual project options
 		statusMapping := config.Field{
 			Field:  "Status",
 			Values: make(map[string]string),
 		}
-		
+
 		// Set the first status option as the default
 		if len(statusField.Options) > 0 {
 			firstOption := statusField.Options[0].Name
@@ -673,13 +673,13 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 			cfg.Defaults.Status = normalizedKey
 			statusMapping.Values[normalizedKey] = firstOption
 		}
-		
+
 		// Map all status options using their normalized names as keys
 		for _, opt := range statusField.Options {
 			// Create normalized key from the actual option name
 			normalizedKey := strings.ToLower(strings.ReplaceAll(opt.Name, " ", "_"))
 			statusMapping.Values[normalizedKey] = opt.Name
-			
+
 			// Also add common aliases for convenience
 			lowerOpt := strings.ToLower(opt.Name)
 			switch {
@@ -701,7 +701,7 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 				statusMapping.Values["complete"] = opt.Name
 			}
 		}
-		
+
 		fmt.Print("\nWould you like to configure status field mappings? (y/N): ")
 		scanner := bufio.NewScanner(os.Stdin)
 		if scanner.Scan() {
@@ -712,7 +712,7 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 				for key, val := range statusMapping.Values {
 					fmt.Printf("  %s -> %s\n", key, val)
 				}
-				
+
 				fmt.Print("\nWould you like to customize these mappings? (y/N): ")
 				if scanner.Scan() {
 					response := strings.ToLower(strings.TrimSpace(scanner.Text()))
@@ -728,15 +728,15 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 						}
 					}
 				}
-				
+
 				fmt.Println("✓ Status field mappings configured")
 			}
 		}
-		
+
 		// Always update the config with the actual field mappings
 		cfg.Fields["status"] = statusMapping
 	}
-	
+
 	// Look for Priority field
 	var priorityField *project.Field
 	for _, field := range fields {
@@ -745,19 +745,19 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 			break
 		}
 	}
-	
+
 	if priorityField != nil && len(priorityField.Options) > 0 {
 		fmt.Println("\nFound Priority field with the following options:")
 		for i, opt := range priorityField.Options {
 			fmt.Printf("  %d. %s\n", i+1, opt.Name)
 		}
-		
+
 		// Always update priority field mappings based on actual project options
 		priorityMapping := config.Field{
 			Field:  "Priority",
 			Values: make(map[string]string),
 		}
-		
+
 		// Set default priority to middle option if available, otherwise first
 		middleIndex := len(priorityField.Options) / 2
 		if middleIndex < len(priorityField.Options) {
@@ -766,13 +766,13 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 			cfg.Defaults.Priority = normalizedKey
 			priorityMapping.Values[normalizedKey] = defaultPriority
 		}
-		
+
 		// Map all priority options using their normalized names as keys
 		for _, opt := range priorityField.Options {
 			// Create normalized key from the actual option name
 			normalizedKey := strings.ToLower(strings.ReplaceAll(opt.Name, " ", "_"))
 			priorityMapping.Values[normalizedKey] = opt.Name
-			
+
 			// Also add common aliases for convenience
 			lowerOpt := strings.ToLower(opt.Name)
 			switch {
@@ -798,7 +798,7 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 				priorityMapping.Values["low"] = opt.Name
 			}
 		}
-		
+
 		fmt.Print("\nWould you like to configure priority field mappings? (y/N): ")
 		scanner := bufio.NewScanner(os.Stdin)
 		if scanner.Scan() {
@@ -809,7 +809,7 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 				for key, val := range priorityMapping.Values {
 					fmt.Printf("  %s -> %s\n", key, val)
 				}
-				
+
 				fmt.Print("\nWould you like to customize these mappings? (y/N): ")
 				if scanner.Scan() {
 					response := strings.ToLower(strings.TrimSpace(scanner.Text()))
@@ -825,11 +825,11 @@ func configureFieldMappings(cfg *config.Config, proj *project.Project, client *p
 						}
 					}
 				}
-				
+
 				fmt.Println("✓ Priority field mappings configured")
 			}
 		}
-		
+
 		// Always update the config with the actual field mappings
 		cfg.Fields["priority"] = priorityMapping
 	}

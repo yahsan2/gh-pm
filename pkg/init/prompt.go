@@ -26,12 +26,12 @@ func NewInteractivePrompt() *InteractivePrompt {
 func (p *InteractivePrompt) ConfirmOverwrite() bool {
 	fmt.Println("Configuration file .gh-pm.yml already exists in this directory or a parent directory.")
 	fmt.Print("Do you want to overwrite it? (y/N): ")
-	
+
 	if p.scanner.Scan() {
 		response := strings.ToLower(strings.TrimSpace(p.scanner.Text()))
 		return response == "y" || response == "yes"
 	}
-	
+
 	return false
 }
 
@@ -40,7 +40,7 @@ func (p *InteractivePrompt) SelectProject(projects []project.Project, source str
 	if len(projects) == 0 {
 		return nil
 	}
-	
+
 	// If only one project, auto-select with confirmation
 	if len(projects) == 1 {
 		fmt.Printf("Found 1 project: %s (#%d)\n", projects[0].Title, projects[0].Number)
@@ -53,7 +53,7 @@ func (p *InteractivePrompt) SelectProject(projects []project.Project, source str
 		}
 		return nil
 	}
-	
+
 	// Multiple projects, show selection menu
 	fmt.Printf("\nAvailable projects from %s:\n", source)
 	fmt.Println(strings.Repeat("-", 70))
@@ -70,10 +70,10 @@ func (p *InteractivePrompt) SelectProject(projects []project.Project, source str
 	fmt.Printf("  0. Skip project selection\n")
 	fmt.Printf("  N. Enter project number directly\n")
 	fmt.Printf("\nSelect a project (0-%d) or enter 'N' for project number: ", len(projects))
-	
+
 	if p.scanner.Scan() {
 		input := strings.TrimSpace(p.scanner.Text())
-		
+
 		// Check if user wants to enter project number directly
 		if strings.ToLower(input) == "n" {
 			fmt.Print("Enter project number: ")
@@ -91,7 +91,7 @@ func (p *InteractivePrompt) SelectProject(projects []project.Project, source str
 			}
 			return nil
 		}
-		
+
 		// Try to parse as selection number
 		choice, err := strconv.Atoi(input)
 		if err == nil && choice >= 0 && choice <= len(projects) {
@@ -100,7 +100,7 @@ func (p *InteractivePrompt) SelectProject(projects []project.Project, source str
 			}
 			return &projects[choice-1]
 		}
-		
+
 		// Try to match by project name (partial match)
 		lowerInput := strings.ToLower(input)
 		for _, proj := range projects {
@@ -116,7 +116,7 @@ func (p *InteractivePrompt) SelectProject(projects []project.Project, source str
 			}
 		}
 	}
-	
+
 	fmt.Println("Invalid selection, skipping project selection.")
 	return nil
 }
@@ -126,23 +126,23 @@ func (p *InteractivePrompt) ConfigureFieldMapping(field project.Field) map[strin
 	if field.DataType != "SINGLE_SELECT" || len(field.Options) == 0 {
 		return nil
 	}
-	
+
 	fmt.Printf("\nFound %s field with the following options:\n", field.Name)
 	for i, opt := range field.Options {
 		fmt.Printf("  %d. %s\n", i+1, opt.Name)
 	}
-	
+
 	fmt.Printf("\nWould you like to configure %s field mappings? (y/N): ", strings.ToLower(field.Name))
 	if p.scanner.Scan() {
 		response := strings.ToLower(strings.TrimSpace(p.scanner.Text()))
 		if response == "y" || response == "yes" {
 			mappings := make(map[string]string)
-			
+
 			// Auto-generate mappings first
 			for _, opt := range field.Options {
 				lowerOpt := strings.ToLower(opt.Name)
 				var key string
-				
+
 				if strings.EqualFold(field.Name, "Status") {
 					switch {
 					case strings.Contains(lowerOpt, "todo") || strings.Contains(lowerOpt, "backlog"):
@@ -166,26 +166,26 @@ func (p *InteractivePrompt) ConfigureFieldMapping(field project.Field) map[strin
 						key = "critical"
 					}
 				}
-				
+
 				if key != "" {
 					mappings[key] = opt.Name
 				}
 			}
-			
+
 			// Show auto-generated mappings
 			if len(mappings) > 0 {
 				fmt.Println("\nConfigured mappings:")
 				for key, val := range mappings {
 					fmt.Printf("  %s -> %s\n", key, val)
 				}
-				
+
 				fmt.Print("\nWould you like to customize these mappings? (y/N): ")
 				if p.scanner.Scan() {
 					response := strings.ToLower(strings.TrimSpace(p.scanner.Text()))
 					if response == "y" || response == "yes" {
 						// Allow manual customization
 						mappings = make(map[string]string)
-						
+
 						for _, opt := range field.Options {
 							validKeys := p.getValidKeys(field.Name)
 							fmt.Printf("\nMap '%s' to (%s/skip): ", opt.Name, strings.Join(validKeys, "/"))
@@ -199,11 +199,11 @@ func (p *InteractivePrompt) ConfigureFieldMapping(field project.Field) map[strin
 					}
 				}
 			}
-			
+
 			return mappings
 		}
 	}
-	
+
 	return nil
 }
 
@@ -214,7 +214,7 @@ func (p *InteractivePrompt) GetStringInput(prompt string, defaultValue string) s
 	} else {
 		fmt.Printf("%s: ", prompt)
 	}
-	
+
 	if p.scanner.Scan() {
 		input := strings.TrimSpace(p.scanner.Text())
 		if input == "" && defaultValue != "" {
@@ -222,7 +222,7 @@ func (p *InteractivePrompt) GetStringInput(prompt string, defaultValue string) s
 		}
 		return input
 	}
-	
+
 	return defaultValue
 }
 

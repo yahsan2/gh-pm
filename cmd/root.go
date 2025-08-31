@@ -25,9 +25,9 @@ This extension allows you to:
 
 // Global flags
 var (
-	projectName string
-	orgName     string
-	repoNames   []string
+	projectName  string
+	orgName      string
+	repoNames    []string
 	outputFormat string
 )
 

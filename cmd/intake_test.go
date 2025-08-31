@@ -33,9 +33,9 @@ func TestIntakeCommand_ParseApplyFlags(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "handles empty flags",
-			applyFlags: []string{},
-			expected:   map[string]string{},
+			name:        "handles empty flags",
+			applyFlags:  []string{},
+			expected:    map[string]string{},
 			expectError: false,
 		},
 		{
@@ -53,7 +53,7 @@ func TestIntakeCommand_ParseApplyFlags(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := make(map[string]string)
-			
+
 			// Parse apply flags (extracted logic from runIntake)
 			for _, apply := range tt.applyFlags {
 				parts := strings.SplitN(apply, ":", 2)
@@ -63,7 +63,7 @@ func TestIntakeCommand_ParseApplyFlags(t *testing.T) {
 					result[field] = value
 				}
 			}
-			
+
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -90,7 +90,7 @@ func TestIntakeCommand_ValidateConfig(t *testing.T) {
 		{
 			name: "missing project configuration",
 			config: &config.Config{
-				Project: config.ProjectConfig{},
+				Project:      config.ProjectConfig{},
 				Repositories: []string{"owner/repo"},
 			},
 			expectError: true,
@@ -112,7 +112,7 @@ func TestIntakeCommand_ValidateConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Validate config (extracted logic from Execute)
 			hasError := tt.config.Project.Name == "" && tt.config.Project.Number == 0
-			
+
 			if tt.expectError {
 				assert.True(t, hasError, "Expected error for invalid config")
 			} else {
@@ -244,7 +244,7 @@ func TestIntakeCommand_FieldMapping(t *testing.T) {
 			default:
 				fieldName = tt.fieldKey
 			}
-			
+
 			// Find the field
 			var targetField *project.Field
 			for _, field := range tt.fields {
@@ -253,7 +253,7 @@ func TestIntakeCommand_FieldMapping(t *testing.T) {
 					break
 				}
 			}
-			
+
 			if targetField == nil {
 				if tt.expectErr {
 					assert.Nil(t, targetField, "Expected field not found")
@@ -262,7 +262,7 @@ func TestIntakeCommand_FieldMapping(t *testing.T) {
 				}
 				return
 			}
-			
+
 			// Find the option ID
 			var optionID string
 			if targetField.DataType == "SINGLE_SELECT" {
@@ -277,7 +277,7 @@ func TestIntakeCommand_FieldMapping(t *testing.T) {
 						}
 					}
 				}
-				
+
 				// Direct match as fallback
 				if optionID == "" {
 					for _, option := range targetField.Options {
@@ -288,7 +288,7 @@ func TestIntakeCommand_FieldMapping(t *testing.T) {
 					}
 				}
 			}
-			
+
 			if tt.expectErr {
 				assert.Empty(t, optionID, "Expected no option ID for error case")
 			} else {

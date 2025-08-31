@@ -40,18 +40,18 @@ This command shows:
 
 // Command flags
 var (
-	viewRepo      string
-	viewQuiet     bool
-	viewWeb       bool
-	viewComments  bool
+	viewRepo     string
+	viewQuiet    bool
+	viewWeb      bool
+	viewComments bool
 )
 
 func init() {
 	rootCmd.AddCommand(viewCmd)
-	
+
 	// Repository selection
 	viewCmd.Flags().StringVarP(&viewRepo, "repo", "r", "", "Repository (owner/repo format)")
-	
+
 	// Output options
 	viewCmd.Flags().BoolVarP(&viewQuiet, "quiet", "q", false, "Only output URLs")
 	viewCmd.Flags().BoolVarP(&viewWeb, "web", "w", false, "Open in web browser")
@@ -72,22 +72,22 @@ func runView(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("invalid issue number: %s", args[0])
 	}
-	
+
 	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		// Configuration is optional for view command
 		cfg = &config.Config{}
 	}
-	
+
 	// Create clients
 	projectClient, err := project.NewClient()
 	if err != nil {
 		return fmt.Errorf("failed to create project client: %w", err)
 	}
-	
+
 	issueClient := issue.NewClient()
-	
+
 	// Create output formatter
 	formatType := output.FormatTable // Default
 	if viewQuiet {
@@ -97,12 +97,12 @@ func runView(cmd *cobra.Command, args []string) error {
 	} else if outputFormat == "csv" {
 		formatType = output.FormatCSV
 	}
-	
+
 	formatter := output.NewFormatter(formatType)
-	
+
 	// Create URL builder
 	urlBuilder := project.NewURLBuilder(cfg, projectClient)
-	
+
 	// Create command executor
 	command := &ViewCommand{
 		config:     cfg,
@@ -111,7 +111,7 @@ func runView(cmd *cobra.Command, args []string) error {
 		formatter:  formatter,
 		urlBuilder: urlBuilder,
 	}
-	
+
 	return command.Execute(issueNumber)
 }
 
@@ -121,18 +121,18 @@ func (c *ViewCommand) Execute(issueNumber int) error {
 	if repo == "" && len(c.config.Repositories) > 0 {
 		repo = c.config.Repositories[0]
 	}
-	
+
 	// If web flag is set, open in browser
 	if viewWeb {
 		return c.openInBrowser(issueNumber, repo)
 	}
-	
+
 	// Get issue details
 	issueDetails, err := c.getIssueDetails(issueNumber, repo)
 	if err != nil {
 		return fmt.Errorf("failed to get issue details: %w", err)
 	}
-	
+
 	// Get project metadata if configured
 	if c.config.Project.Name != "" || c.config.Project.Number > 0 {
 		projectData, err := c.getProjectMetadata(issueDetails)
@@ -141,14 +141,14 @@ func (c *ViewCommand) Execute(issueNumber int) error {
 			fmt.Printf("Warning: could not get project metadata: %v\n", err)
 		} else {
 			issueDetails.ProjectItem = projectData
-			
+
 			// Build project URL
 			if projectData != nil && projectData.DatabaseID > 0 {
 				issueDetails.ProjectURL = c.urlBuilder.GetProjectItemURL(projectData.DatabaseID)
 			}
 		}
 	}
-	
+
 	// Get comments if requested
 	if viewComments {
 		comments, err := c.getIssueComments(issueNumber, repo)
@@ -158,26 +158,26 @@ func (c *ViewCommand) Execute(issueNumber int) error {
 			issueDetails.Comments = comments
 		}
 	}
-	
+
 	// Format and display output
 	return c.formatter.FormatIssueView(issueDetails)
 }
 
 func (c *ViewCommand) getIssueDetails(issueNumber int, repo string) (*issue.Issue, error) {
 	// Use gh issue view to get detailed information
-	args := []string{"issue", "view", strconv.Itoa(issueNumber), "--json", 
+	args := []string{"issue", "view", strconv.Itoa(issueNumber), "--json",
 		"id,number,title,body,url,state,labels,assignees,milestone,createdAt,updatedAt,closedAt,author"}
-	
+
 	if repo != "" {
 		args = append(args, "--repo", repo)
 	}
-	
+
 	cmd := exec.Command("gh", args...)
 	_, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get issue: %w", err)
 	}
-	
+
 	// Parse the JSON output
 	// For now, we'll use the simpler GetIssueDetails function
 	return issue.GetIssueDetails(issueNumber, repo)
@@ -189,7 +189,7 @@ func (c *ViewCommand) getProjectMetadata(issueDetails *issue.Issue) (*issue.Proj
 	if projectID == "" {
 		var proj *project.Project
 		var err error
-		
+
 		if c.config.Project.Org != "" {
 			proj, err = c.client.GetProject(
 				c.config.Project.Org,
@@ -202,7 +202,7 @@ func (c *ViewCommand) getProjectMetadata(issueDetails *issue.Issue) (*issue.Proj
 				c.config.Project.Number,
 			)
 		}
-		
+
 		if err != nil {
 			return nil, err
 		}
@@ -210,26 +210,26 @@ func (c *ViewCommand) getProjectMetadata(issueDetails *issue.Issue) (*issue.Proj
 		// Cache the project ID for future use
 		c.config.SetProjectID(projectID)
 	}
-	
+
 	// Get project item for this issue
 	itemData, err := c.client.GetProjectItemForIssue(projectID, issueDetails.ID)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Get project fields
 	fields, err := c.client.GetFieldsWithOptions(projectID)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Map field values
 	projectItem := &issue.ProjectItem{
 		ID:         itemData.ID,
 		DatabaseID: itemData.DatabaseID,
 		Fields:     make(map[string]interface{}),
 	}
-	
+
 	// Extract field values from item data
 	for _, field := range fields {
 		if field.DataType == "SINGLE_SELECT" {
@@ -252,23 +252,23 @@ func (c *ViewCommand) getProjectMetadata(issueDetails *issue.Issue) (*issue.Proj
 			}
 		}
 	}
-	
+
 	return projectItem, nil
 }
 
 func (c *ViewCommand) getIssueComments(issueNumber int, repo string) ([]issue.Comment, error) {
 	args := []string{"issue", "view", strconv.Itoa(issueNumber), "--comments", "--json", "comments"}
-	
+
 	if repo != "" {
 		args = append(args, "--repo", repo)
 	}
-	
+
 	cmd := exec.Command("gh", args...)
 	_, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get comments: %w", err)
 	}
-	
+
 	// Parse comments from output
 	// This is a simplified implementation
 	return []issue.Comment{}, nil
@@ -280,10 +280,10 @@ func (c *ViewCommand) openInBrowser(issueNumber int, repo string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Determine which URL to open
 	urlToOpen := issueDetails.URL
-	
+
 	// If project URL is available and configured, prefer that
 	if c.config.Project.Number > 0 {
 		projectData, err := c.getProjectMetadata(issueDetails)
@@ -294,12 +294,12 @@ func (c *ViewCommand) openInBrowser(issueNumber int, repo string) error {
 			}
 		}
 	}
-	
+
 	// Print the URL we're opening
 	if _, err := fmt.Fprintf(os.Stderr, "Opening %s in your browser.\n", urlToOpen); err != nil {
 		// Ignore error, just for user feedback
 	}
-	
+
 	// Open URL in browser based on OS
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
@@ -319,10 +319,10 @@ func (c *ViewCommand) openInBrowser(issueNumber int, repo string) error {
 			return fmt.Errorf("could not find a suitable browser command")
 		}
 	}
-	
+
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to open browser: %w", err)
 	}
-	
+
 	return nil
 }

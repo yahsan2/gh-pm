@@ -13,16 +13,16 @@ import (
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	assert.NotNil(t, cfg)
 	assert.Equal(t, "medium", cfg.Defaults.Priority)
 	assert.Equal(t, "todo", cfg.Defaults.Status)
 	assert.Contains(t, cfg.Defaults.Labels, "pm-tracked")
-	
+
 	// Check field mappings
 	assert.Contains(t, cfg.Fields, "priority")
 	assert.Contains(t, cfg.Fields, "status")
-	
+
 	priorityField := cfg.Fields["priority"]
 	assert.Equal(t, "Priority", priorityField.Field)
 	assert.Contains(t, priorityField.Values, "low")
@@ -36,11 +36,11 @@ func TestConfigSaveAndLoad(t *testing.T) {
 	tmpDir := t.TempDir()
 	originalWd, _ := os.Getwd()
 	defer os.Chdir(originalWd)
-	
+
 	// Change to temp directory
 	err := os.Chdir(tmpDir)
 	require.NoError(t, err)
-	
+
 	// Create config
 	cfg := &Config{
 		Project: ProjectConfig{
@@ -64,20 +64,20 @@ func TestConfigSaveAndLoad(t *testing.T) {
 			},
 		},
 	}
-	
+
 	// Save config
 	configPath := filepath.Join(tmpDir, ConfigFileName)
 	err = cfg.Save(configPath)
 	require.NoError(t, err)
-	
+
 	// Verify file exists
 	_, err = os.Stat(configPath)
 	assert.NoError(t, err)
-	
+
 	// Load config
 	loadedCfg, err := Load()
 	require.NoError(t, err)
-	
+
 	// Verify loaded config matches original
 	assert.Equal(t, cfg.Project.Name, loadedCfg.Project.Name)
 	assert.Equal(t, cfg.Project.Number, loadedCfg.Project.Number)
@@ -93,19 +93,19 @@ func TestConfigExists(t *testing.T) {
 	tmpDir := t.TempDir()
 	originalWd, _ := os.Getwd()
 	defer os.Chdir(originalWd)
-	
+
 	// Change to temp directory
 	err := os.Chdir(tmpDir)
 	require.NoError(t, err)
-	
+
 	// Should not exist initially
 	assert.False(t, Exists())
-	
+
 	// Create config file
 	cfg := DefaultConfig()
 	err = cfg.Save(ConfigFileName)
 	require.NoError(t, err)
-	
+
 	// Should exist now
 	assert.True(t, Exists())
 }
@@ -115,13 +115,13 @@ func TestConfigYAMLFormat(t *testing.T) {
 	cfg.Project.Name = "My Project"
 	cfg.Project.Org = "my-org"
 	cfg.Repositories = []string{"my-org/repo1"}
-	
+
 	// Marshal to YAML
 	data, err := yaml.Marshal(cfg)
 	require.NoError(t, err)
-	
+
 	yamlStr := string(data)
-	
+
 	// Verify YAML structure
 	assert.Contains(t, yamlStr, "project:")
 	assert.Contains(t, yamlStr, "name: My Project")
@@ -138,11 +138,11 @@ func TestSaveWithMetadata(t *testing.T) {
 	tmpDir := t.TempDir()
 	originalWd, _ := os.Getwd()
 	defer os.Chdir(originalWd)
-	
+
 	// Change to temp directory
 	err := os.Chdir(tmpDir)
 	require.NoError(t, err)
-	
+
 	// Create config with metadata
 	cfg := DefaultConfig()
 	cfg.Project.Name = "Test Project"
@@ -175,21 +175,21 @@ func TestSaveWithMetadata(t *testing.T) {
 			},
 		},
 	}
-	
+
 	// Save with metadata
 	configPath := filepath.Join(tmpDir, ConfigFileName)
 	err = cfg.SaveWithMetadata(configPath)
 	require.NoError(t, err)
-	
+
 	// Load and verify
 	loadedCfg, err := Load()
 	require.NoError(t, err)
-	
+
 	// Verify metadata was saved and loaded correctly
 	assert.NotNil(t, loadedCfg.Metadata)
 	assert.Equal(t, "PVT_kwHOAAlRwM4A8arc", loadedCfg.Metadata.Project.ID)
 	assert.Len(t, loadedCfg.Metadata.Fields, 2)
-	
+
 	// Find Status field
 	var statusField *FieldInfo
 	for _, field := range loadedCfg.Metadata.Fields {
@@ -201,7 +201,7 @@ func TestSaveWithMetadata(t *testing.T) {
 	assert.NotNil(t, statusField)
 	assert.Equal(t, "PVTSSF_lAHOAAlRwM4A8arczgwbDH4", statusField.ID)
 	assert.Len(t, statusField.Options, 3)
-	
+
 	// Find Priority field
 	var priorityField *FieldInfo
 	for _, field := range loadedCfg.Metadata.Fields {
@@ -220,46 +220,46 @@ func TestConfigWithoutMetadata(t *testing.T) {
 	tmpDir := t.TempDir()
 	originalWd, _ := os.Getwd()
 	defer os.Chdir(originalWd)
-	
+
 	// Change to temp directory
 	err := os.Chdir(tmpDir)
 	require.NoError(t, err)
-	
+
 	// Create config without metadata
 	cfg := DefaultConfig()
 	cfg.Project.Name = "Test Project"
-	
+
 	// Save without metadata
 	configPath := filepath.Join(tmpDir, ConfigFileName)
 	err = cfg.Save(configPath)
 	require.NoError(t, err)
-	
+
 	// Load and verify
 	loadedCfg, err := Load()
 	require.NoError(t, err)
-	
+
 	// Verify metadata is nil
 	assert.Nil(t, loadedCfg.Metadata)
-	
+
 	// Verify other fields are intact
 	assert.Equal(t, "Test Project", loadedCfg.Project.Name)
 }
 
 func TestLoadMetadata(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	// Test with no metadata
 	metadata, err := cfg.LoadMetadata()
 	assert.Error(t, err)
 	assert.Nil(t, metadata)
-	
+
 	// Test with metadata
 	cfg.Metadata = &ConfigMetadata{
 		Project: ProjectMetadata{
 			ID: "PVT_test",
 		},
 	}
-	
+
 	metadata, err = cfg.LoadMetadata()
 	assert.NoError(t, err)
 	assert.NotNil(t, metadata)
@@ -284,13 +284,13 @@ func TestMetadataYAMLFormat(t *testing.T) {
 			},
 		},
 	}
-	
+
 	// Marshal to YAML
 	data, err := yaml.Marshal(cfg)
 	require.NoError(t, err)
-	
+
 	yamlStr := string(data)
-	
+
 	// Verify metadata section in YAML
 	assert.Contains(t, yamlStr, "metadata:")
 	assert.Contains(t, yamlStr, "project:")
@@ -324,31 +324,31 @@ fields:
     values:
       todo: Todo
 `
-	
+
 	// Unmarshal old format
 	var cfg Config
 	err := yaml.Unmarshal([]byte(oldFormatYAML), &cfg)
 	require.NoError(t, err)
-	
+
 	// Verify it loads correctly without metadata
 	assert.Equal(t, "Old Project", cfg.Project.Name)
 	assert.Equal(t, "old-org", cfg.Project.Org)
 	assert.Nil(t, cfg.Metadata)
-	
+
 	// Save and reload to ensure it remains compatible
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "test-config.yml")
 	err = cfg.Save(configPath)
 	require.NoError(t, err)
-	
+
 	// Reload
 	data, err := os.ReadFile(configPath)
 	require.NoError(t, err)
-	
+
 	var reloadedCfg Config
 	err = yaml.Unmarshal(data, &reloadedCfg)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, cfg.Project.Name, reloadedCfg.Project.Name)
 	assert.Nil(t, reloadedCfg.Metadata)
 }
@@ -358,7 +358,7 @@ func TestValidate(t *testing.T) {
 		name    string
 		config  *Config
 		wantErr bool
-		errMsg string
+		errMsg  string
 	}{
 		{
 			name: "valid config with project name",
@@ -540,7 +540,7 @@ func TestLoadConfig(t *testing.T) {
 			setupFunc: func() func() {
 				tmpDir, _ := os.MkdirTemp("", "test")
 				configFile := filepath.Join(tmpDir, ConfigFileName)
-				
+
 				config := &Config{
 					Project: ProjectConfig{
 						Name:   "Test Project",
@@ -551,13 +551,13 @@ func TestLoadConfig(t *testing.T) {
 						Labels: []string{"bug", "enhancement"},
 					},
 				}
-				
+
 				data, _ := yaml.Marshal(config)
 				os.WriteFile(configFile, data, 0644)
-				
+
 				origDir, _ := os.Getwd()
 				os.Chdir(tmpDir)
-				
+
 				return func() {
 					os.Chdir(origDir)
 					os.RemoveAll(tmpDir)
@@ -581,7 +581,7 @@ func TestLoadConfig(t *testing.T) {
 				tmpDir, _ := os.MkdirTemp("", "test")
 				origDir, _ := os.Getwd()
 				os.Chdir(tmpDir)
-				
+
 				return func() {
 					os.Chdir(origDir)
 					os.RemoveAll(tmpDir)
@@ -594,12 +594,12 @@ func TestLoadConfig(t *testing.T) {
 			setupFunc: func() func() {
 				tmpDir, _ := os.MkdirTemp("", "test")
 				configFile := filepath.Join(tmpDir, ConfigFileName)
-				
+
 				os.WriteFile(configFile, []byte("invalid: yaml: content:"), 0644)
-				
+
 				origDir, _ := os.Getwd()
 				os.Chdir(tmpDir)
-				
+
 				return func() {
 					os.Chdir(origDir)
 					os.RemoveAll(tmpDir)
@@ -638,3 +638,4 @@ func TestLoadConfig(t *testing.T) {
 func contains(s, substr string) bool {
 	return strings.Contains(s, substr)
 }
+

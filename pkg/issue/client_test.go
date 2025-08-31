@@ -15,12 +15,12 @@ func TestNewClient(t *testing.T) {
 
 func TestCreateIssue(t *testing.T) {
 	tests := []struct {
-		name      string
-		req       IssueRequest
-		mockCmd   func(*exec.Cmd) error
-		want      Issue
-		wantErr   bool
-		errMsg    string
+		name    string
+		req     IssueRequest
+		mockCmd func(*exec.Cmd) error
+		want    Issue
+		wantErr bool
+		errMsg  string
 	}{
 		{
 			name: "successful issue creation",
@@ -298,14 +298,14 @@ func TestUpdateProjectItemField(t *testing.T) {
 			if tt.projectID == "" || tt.itemID == "" || tt.fieldID == "" {
 				// Test that the function would validate these
 				// In actual implementation, UpdateProjectItemField should validate
-				t.Logf("Would validate: projectID=%s, itemID=%s, fieldID=%s", 
+				t.Logf("Would validate: projectID=%s, itemID=%s, fieldID=%s",
 					tt.projectID, tt.itemID, tt.fieldID)
 				if tt.wantErr {
 					// Expected error case
 					return
 				}
 			}
-			
+
 			// Note: Actual GraphQL testing would require mocking
 			t.Skip("Requires GraphQL mocking")
 		})
@@ -357,7 +357,7 @@ func TestCreateIssueWithData(t *testing.T) {
 				}
 				t.Errorf("Expected validation to pass but would fail")
 			}
-			
+
 			// Note: Actual issue creation would require mocking
 			t.Skip("Requires exec.Command mocking")
 		})
@@ -403,7 +403,7 @@ func TestAddToProject(t *testing.T) {
 				}
 				t.Errorf("Expected validation to pass but would fail")
 			}
-			
+
 			// Note: Actual GraphQL calls would require mocking
 			t.Skip("Requires GraphQL mocking")
 		})
@@ -446,3 +446,4 @@ func TestGetProjectItemID(t *testing.T) {
 		})
 	}
 }
+

@@ -8,8 +8,8 @@ import (
 
 // Build information set at compile time via ldflags
 var (
-	Commit  = "none"
-	Date    = "unknown"
+	Commit = "none"
+	Date   = "unknown"
 )
 
 var versionCmd = &cobra.Command{

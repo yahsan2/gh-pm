@@ -26,19 +26,19 @@ func (c *Creator) CreateIssue(data *IssueData) (*Issue, error) {
 	if err := data.Validate(); err != nil {
 		return nil, NewValidationError("invalid issue data", err)
 	}
-	
+
 	// Prepare the request
 	requestData := data.ToCreateRequest()
-	
+
 	// Convert request to JSON
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
 		return nil, NewAPIError("failed to marshal request", err)
 	}
-	
+
 	// Create the issue using REST API
 	path := fmt.Sprintf("repos/%s/%s/issues", data.GetOwner(), data.GetRepo())
-	
+
 	var response map[string]interface{}
 	err = c.client.rest.Post(path, bytes.NewReader(jsonData), &response)
 	if err != nil {
@@ -51,12 +51,12 @@ func (c *Creator) CreateIssue(data *IssueData) (*Issue, error) {
 		}
 		return nil, NewAPIError("failed to create issue", err)
 	}
-	
+
 	// Parse the response
 	issue := &Issue{
 		Repository: data.Repository,
 	}
-	
+
 	// Extract fields from response
 	if id, ok := response["node_id"].(string); ok {
 		issue.ID = id
@@ -73,7 +73,7 @@ func (c *Creator) CreateIssue(data *IssueData) (*Issue, error) {
 	if state, ok := response["state"].(string); ok {
 		issue.State = state
 	}
-	
+
 	// Parse timestamps
 	if createdAt, ok := response["created_at"].(string); ok {
 		if t, err := time.Parse(time.RFC3339, createdAt); err == nil {
@@ -85,7 +85,7 @@ func (c *Creator) CreateIssue(data *IssueData) (*Issue, error) {
 			issue.UpdatedAt = t
 		}
 	}
-	
+
 	// Parse labels
 	if labels, ok := response["labels"].([]interface{}); ok {
 		issue.Labels = make([]Label, 0, len(labels))
@@ -102,7 +102,7 @@ func (c *Creator) CreateIssue(data *IssueData) (*Issue, error) {
 			}
 		}
 	}
-	
+
 	return issue, nil
 }
 
@@ -114,7 +114,7 @@ func (c *Creator) AddToProject(issueID, projectID string) error {
 	if projectID == "" {
 		return NewValidationError("project ID is required", nil)
 	}
-	
+
 	// GraphQL mutation to add item to project
 	mutation := `
 		mutation($projectId: ID!, $contentId: ID!) {
@@ -127,12 +127,12 @@ func (c *Creator) AddToProject(issueID, projectID string) error {
 				}
 			}
 		}`
-	
+
 	variables := map[string]interface{}{
 		"projectId": projectID,
 		"contentId": issueID,
 	}
-	
+
 	var result struct {
 		AddProjectV2ItemById struct {
 			Item struct {
@@ -140,7 +140,7 @@ func (c *Creator) AddToProject(issueID, projectID string) error {
 			} `json:"item"`
 		} `json:"addProjectV2ItemById"`
 	}
-	
+
 	err := c.client.gql.Do(mutation, variables, &result)
 	if err != nil {
 		if strings.Contains(err.Error(), "401") || strings.Contains(err.Error(), "403") {
@@ -151,7 +151,7 @@ func (c *Creator) AddToProject(issueID, projectID string) error {
 		}
 		return NewAPIError("failed to add issue to project", err)
 	}
-	
+
 	return nil
 }
 
@@ -163,14 +163,14 @@ func (c *Creator) UpdateFields(itemID string, fields map[string]interface{}) err
 	if len(fields) == 0 {
 		return nil // Nothing to update
 	}
-	
+
 	// For each field, we need to update it with the appropriate mutation
 	for fieldName, value := range fields {
 		if err := c.updateSingleField(itemID, fieldName, value); err != nil {
 			return WrapError(err, fmt.Sprintf("failed to update field '%s'", fieldName))
 		}
 	}
-	
+
 	return nil
 }
 
@@ -181,7 +181,7 @@ func (c *Creator) updateSingleField(itemID string, fieldName string, value inter
 	// 1. Get the field ID and type from project metadata
 	// 2. Use the appropriate mutation based on field type (text, single_select, etc.)
 	// 3. Convert the value to the appropriate format
-	
+
 	// For now, we'll return a placeholder error
 	return fmt.Errorf("field update not fully implemented - requires project metadata")
 }
@@ -203,12 +203,12 @@ func (c *Creator) GetProjectItemID(issueID, projectID string) (string, error) {
 				}
 			}
 		}`
-	
+
 	variables := map[string]interface{}{
 		"issueId":   issueID,
 		"projectId": projectID,
 	}
-	
+
 	var result struct {
 		Node struct {
 			ProjectItems struct {
@@ -221,19 +221,18 @@ func (c *Creator) GetProjectItemID(issueID, projectID string) (string, error) {
 			} `json:"projectItems"`
 		} `json:"node"`
 	}
-	
+
 	err := c.client.gql.Do(query, variables, &result)
 	if err != nil {
 		return "", NewAPIError("failed to get project item", err)
 	}
-	
+
 	// Find the item for the specified project
 	for _, item := range result.Node.ProjectItems.Nodes {
 		if item.Project.ID == projectID {
 			return item.ID, nil
 		}
 	}
-	
+
 	return "", NewNotFoundError("project item")
 }
-

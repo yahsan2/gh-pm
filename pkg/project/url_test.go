@@ -2,7 +2,7 @@ package project
 
 import (
 	"testing"
-	
+
 	"github.com/yahsan2/gh-pm/pkg/config"
 )
 
@@ -52,7 +52,7 @@ func TestURLBuilder_GetProjectURL(t *testing.T) {
 			want: "",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := NewURLBuilder(tt.config, nil)
@@ -102,7 +102,7 @@ func TestURLBuilder_GetProjectItemURL(t *testing.T) {
 			want:           "",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := NewURLBuilder(tt.config, nil)

@@ -1,18 +1,18 @@
 package cmd
 
 import (
-	"fmt"
-	"strings"
-	"os/exec"
-	"encoding/json"
 	"bufio"
+	"encoding/json"
+	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/yahsan2/gh-pm/pkg/config"
-	"github.com/yahsan2/gh-pm/pkg/project"
 	"github.com/yahsan2/gh-pm/pkg/issue"
+	"github.com/yahsan2/gh-pm/pkg/project"
 )
 
 var triageCmd = &cobra.Command{
@@ -82,27 +82,27 @@ func runTriage(cmd *cobra.Command, args []string) error {
 	queryFlag, _ := cmd.Flags().GetString("query")
 	applyFlags, _ := cmd.Flags().GetStringSlice("apply")
 	interactiveFields, _ := cmd.Flags().GetStringSlice("interactive")
-	
+
 	// If either --list or --dry-run is specified, enable list-only mode
 	if dryRun {
 		listOnly = true
 	}
-	
+
 	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w\nRun 'gh pm init' to create a configuration file", err)
 	}
-	
+
 	var triageConfig config.TriageConfig
-	
+
 	// Check if using ad-hoc mode or named configuration
 	if queryFlag != "" {
 		// Ad-hoc mode: --query is required, --apply or --interactive is required (unless --list is specified)
 		if len(applyFlags) == 0 && len(interactiveFields) == 0 && !listOnly {
 			return fmt.Errorf("--query requires either --apply or --interactive flag (or use --list to preview)")
 		}
-		
+
 		// Build triage config from flags
 		triageConfig = config.TriageConfig{
 			Query: queryFlag,
@@ -110,10 +110,10 @@ func runTriage(cmd *cobra.Command, args []string) error {
 				Fields: make(map[string]string),
 				Labels: []string{},
 			},
-			Interactive: config.TriageInteractive{},
+			Interactive:       config.TriageInteractive{},
 			InteractiveFields: make(map[string]bool),
 		}
-		
+
 		// Parse apply flags
 		for _, apply := range applyFlags {
 			parts := strings.SplitN(apply, ":", 2)
@@ -122,14 +122,14 @@ func runTriage(cmd *cobra.Command, args []string) error {
 			}
 			field := strings.TrimSpace(parts[0])
 			value := strings.TrimSpace(parts[1])
-			
+
 			if field == "label" {
 				triageConfig.Apply.Labels = append(triageConfig.Apply.Labels, value)
 			} else {
 				triageConfig.Apply.Fields[field] = value
 			}
 		}
-		
+
 		// Set interactive fields
 		for _, field := range interactiveFields {
 			field = strings.ToLower(strings.TrimSpace(field))
@@ -154,18 +154,18 @@ func runTriage(cmd *cobra.Command, args []string) error {
 	} else {
 		return fmt.Errorf("either provide a triage name or use --query with --apply/--interactive")
 	}
-	
+
 	// Create clients
 	projectClient, err := project.NewClient()
 	if err != nil {
 		return fmt.Errorf("failed to create project client: %w", err)
 	}
-	
+
 	issueClient := issue.NewClient()
-	
+
 	// Create URL builder
 	urlBuilder := project.NewURLBuilder(cfg, projectClient)
-	
+
 	// Create command executor
 	command := &TriageCommand{
 		config:     cfg,
@@ -173,7 +173,7 @@ func runTriage(cmd *cobra.Command, args []string) error {
 		issueAPI:   issueClient,
 		urlBuilder: urlBuilder,
 	}
-	
+
 	return command.Execute(triageConfig, listOnly)
 }
 
@@ -183,25 +183,25 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 	if err != nil {
 		return fmt.Errorf("failed to search issues: %w", err)
 	}
-	
+
 	if len(issues) == 0 {
 		fmt.Printf("No issues found matching query: %s\n", triageConfig.Query)
 		return nil
 	}
-	
+
 	if listOnly {
 		fmt.Printf("Found %d issues that would be affected by triage '%s':\n\n", len(issues), triageConfig.Query)
 		return c.displayIssuesList(issues, triageConfig)
 	}
-	
+
 	fmt.Printf("Found %d issues to triage\n", len(issues))
-	
+
 	// Display instruction if configured
 	if triageConfig.Instruction != "" {
 		// Use dim cyan for instruction
 		fmt.Printf("\n\033[36m%s\033[0m\n\n", triageConfig.Instruction)
 	}
-	
+
 	// Get project ID if needed for field updates or interactive features
 	var projectID string
 	if len(triageConfig.Apply.Fields) > 0 || triageConfig.Interactive.Status || triageConfig.Interactive.Estimate || len(triageConfig.InteractiveFields) > 0 {
@@ -211,7 +211,7 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 				// Fetch project ID if not cached
 				var proj *project.Project
 				var err error
-				
+
 				if c.config.Project.Org != "" {
 					proj, err = c.client.GetProject(
 						c.config.Project.Org,
@@ -224,7 +224,7 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 						c.config.Project.Number,
 					)
 				}
-				
+
 				if err != nil {
 					return fmt.Errorf("failed to get project: %w", err)
 				}
@@ -234,7 +234,7 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 			}
 		}
 	}
-	
+
 	// Get project fields if we need to update them or handle interactive features
 	var fields []project.Field
 	if projectID != "" && (len(triageConfig.Apply.Fields) > 0 || triageConfig.Interactive.Status || triageConfig.Interactive.Estimate || len(triageConfig.InteractiveFields) > 0) {
@@ -268,7 +268,7 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 			}
 		}
 	}
-	
+
 	// Validate interactive fields are supported
 	if len(triageConfig.InteractiveFields) > 0 && len(fields) > 0 {
 		unsupportedFields := []string{}
@@ -288,7 +288,7 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 				unsupportedFields = append(unsupportedFields, fmt.Sprintf("%s (not found)", fieldName))
 			}
 		}
-		
+
 		if len(unsupportedFields) > 0 {
 			fmt.Printf("\nWarning: The following fields cannot be used interactively:\n")
 			for _, field := range unsupportedFields {
@@ -297,18 +297,18 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 			fmt.Printf("\nCurrently supported field types: SINGLE_SELECT, TEXT, NUMBER\n\n")
 		}
 	}
-	
+
 	// Phase 1: Collect all interactive choices first
 	updates := make([]IssueUpdate, 0, len(issues))
-	
+
 	hasInteractive := triageConfig.Interactive.Status || triageConfig.Interactive.Estimate || len(triageConfig.InteractiveFields) > 0
 	if hasInteractive {
 		fmt.Println("\n=== Interactive Selection Phase ===")
 		reader := bufio.NewReader(os.Stdin)
-		
+
 		for _, issue := range issues {
 			update := IssueUpdate{Issue: issue}
-			
+
 			// Get project item ID if needed
 			if projectID != "" {
 				itemID, _, err := c.issueAPI.AddToProjectWithDatabaseID(issue.ID, projectID)
@@ -318,19 +318,19 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 				}
 				update.ItemID = itemID
 			}
-			
+
 			// Collect interactive status choice
 			if triageConfig.Interactive.Status && update.ItemID != "" {
 				statusChoice := c.collectStatusChoice(issue, reader, fields)
 				update.StatusChoice = statusChoice
 			}
-			
+
 			// Collect interactive estimate choice
 			if triageConfig.Interactive.Estimate {
 				estimateChoice := c.collectEstimateChoice(issue, reader)
 				update.EstimateChoice = estimateChoice
 			}
-			
+
 			// Collect other interactive fields
 			if len(triageConfig.InteractiveFields) > 0 && update.ItemID != "" {
 				if update.FieldChoices == nil {
@@ -343,16 +343,16 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 					}
 				}
 			}
-			
+
 			updates = append(updates, update)
 		}
-		
+
 		fmt.Println("\n=== Applying Updates ===")
 	} else {
 		// No interactive fields, just prepare updates
 		for _, issue := range issues {
 			update := IssueUpdate{Issue: issue}
-			
+
 			if projectID != "" {
 				itemID, _, err := c.issueAPI.AddToProjectWithDatabaseID(issue.ID, projectID)
 				if err != nil {
@@ -361,22 +361,22 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 				}
 				update.ItemID = itemID
 			}
-			
+
 			updates = append(updates, update)
 		}
 	}
-	
+
 	// Phase 2: Apply all changes
 	for _, update := range updates {
 		fmt.Printf("Processing issue #%d: %s\n", update.Issue.Number, update.Issue.Title)
-		
+
 		// Apply labels
 		if len(triageConfig.Apply.Labels) > 0 {
 			if err := c.applyLabels(update.Issue.Number, triageConfig.Apply.Labels); err != nil {
 				fmt.Printf("Warning: failed to apply labels to issue #%d: %v\n", update.Issue.Number, err)
 			}
 		}
-		
+
 		// Apply project field updates
 		if projectID != "" && update.ItemID != "" {
 			// Apply configuration fields
@@ -390,43 +390,43 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 				default:
 					fieldName = fieldKey
 				}
-				
+
 				if err := c.updateProjectField(projectID, update.ItemID, fieldName, fieldValue, fields); err != nil {
 					fmt.Printf("Warning: failed to update %s field for issue #%d: %v\n", fieldName, update.Issue.Number, err)
 				}
 			}
-			
-				// Apply interactive status choice
-				if update.StatusChoice != nil {
-					if err := c.updateProjectField(projectID, update.ItemID, "Status", *update.StatusChoice, fields); err != nil {
-						fmt.Printf("Warning: failed to update status for issue #%d: %v\n", update.Issue.Number, err)
-					} else {
-						fmt.Printf("✓ Updated status to '%s' for issue #%d\n", *update.StatusChoice, update.Issue.Number)
-					}
+
+			// Apply interactive status choice
+			if update.StatusChoice != nil {
+				if err := c.updateProjectField(projectID, update.ItemID, "Status", *update.StatusChoice, fields); err != nil {
+					fmt.Printf("Warning: failed to update status for issue #%d: %v\n", update.Issue.Number, err)
+				} else {
+					fmt.Printf("✓ Updated status to '%s' for issue #%d\n", *update.StatusChoice, update.Issue.Number)
 				}
-				
-				// Apply interactive estimate choice
-				if update.EstimateChoice != nil {
-					if err := c.updateEstimateField(projectID, update.ItemID, *update.EstimateChoice, fields); err != nil {
-						fmt.Printf("Warning: failed to update estimate for issue #%d: %v\n", update.Issue.Number, err)
-					} else {
-						fmt.Printf("✓ Set estimate '%s' for issue #%d\n", *update.EstimateChoice, update.Issue.Number)
-					}
+			}
+
+			// Apply interactive estimate choice
+			if update.EstimateChoice != nil {
+				if err := c.updateEstimateField(projectID, update.ItemID, *update.EstimateChoice, fields); err != nil {
+					fmt.Printf("Warning: failed to update estimate for issue #%d: %v\n", update.Issue.Number, err)
+				} else {
+					fmt.Printf("✓ Set estimate '%s' for issue #%d\n", *update.EstimateChoice, update.Issue.Number)
 				}
-				
-				// Apply other interactive field choices
-				for fieldName, fieldValue := range update.FieldChoices {
-					// Capitalize field name for consistency
-					displayFieldName := strings.Title(fieldName)
-					if err := c.updateProjectField(projectID, update.ItemID, displayFieldName, fieldValue, fields); err != nil {
-						fmt.Printf("Warning: failed to update %s for issue #%d: %v\n", fieldName, update.Issue.Number, err)
-					} else {
-						fmt.Printf("✓ Updated %s to '%s' for issue #%d\n", fieldName, fieldValue, update.Issue.Number)
-					}
+			}
+
+			// Apply other interactive field choices
+			for fieldName, fieldValue := range update.FieldChoices {
+				// Capitalize field name for consistency
+				displayFieldName := strings.Title(fieldName)
+				if err := c.updateProjectField(projectID, update.ItemID, displayFieldName, fieldValue, fields); err != nil {
+					fmt.Printf("Warning: failed to update %s for issue #%d: %v\n", fieldName, update.Issue.Number, err)
+				} else {
+					fmt.Printf("✓ Updated %s to '%s' for issue #%d\n", fieldName, fieldValue, update.Issue.Number)
 				}
+			}
 		}
 	}
-	
+
 	fmt.Printf("Triage completed for %d issues\n", len(issues))
 	return nil
 }
@@ -434,9 +434,9 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 	// Parse query to extract field filters
 	fieldFilters := make(map[string]string) // field name -> filter value
-	fieldExcludes := make(map[string]bool) // field name -> true if should be empty/unset
+	fieldExcludes := make(map[string]bool)  // field name -> true if should be empty/unset
 	var labelExcludes []string
-	
+
 	// Get available field names from metadata
 	availableFields := make(map[string]bool)
 	if c.config.Metadata != nil && c.config.Metadata.Fields != nil {
@@ -444,7 +444,7 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 			availableFields[field.Name] = true
 		}
 	}
-	
+
 	parts := strings.Split(query, " ")
 	for _, part := range parts {
 		// Check for label exclusions
@@ -452,12 +452,12 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 			labelExcludes = append(labelExcludes, strings.TrimPrefix(part, "-label:"))
 			continue
 		}
-		
+
 		// Check for field exclusions (-has:fieldname)
 		if strings.HasPrefix(part, "-has:") {
 			fieldName := strings.TrimPrefix(part, "-has:")
 			fieldFound := false
-			
+
 			// Try to find the field in metadata (case-insensitive)
 			for availField := range availableFields {
 				if strings.EqualFold(availField, fieldName) {
@@ -466,7 +466,7 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 					break
 				}
 			}
-			
+
 			// If not found in metadata, check config field names
 			if !fieldFound && c.config.Fields != nil {
 				// Check if it's a config field name (like "status", "priority", "estimate")
@@ -494,16 +494,16 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 			}
 			continue
 		}
-		
+
 		// Check for field filters dynamically
 		if strings.Contains(part, ":") {
 			colonIdx := strings.Index(part, ":")
 			fieldName := part[:colonIdx]
 			fieldValue := part[colonIdx+1:]
-			
+
 			// Try to find field in metadata (case-insensitive) or config
 			fieldFound := false
-			
+
 			// First check metadata fields (case-insensitive)
 			for availField := range availableFields {
 				if strings.EqualFold(availField, fieldName) {
@@ -512,7 +512,7 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 					break
 				}
 			}
-			
+
 			// If not found in metadata, check config field names
 			if !fieldFound && c.config.Fields != nil {
 				// Check if it's a config field name (like "status", "priority")
@@ -526,32 +526,32 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 			}
 		}
 	}
-	
+
 	// If we have field filters/excludes and project metadata, use optimized GraphQL query
 	if (len(fieldFilters) > 0 || len(fieldExcludes) > 0) && c.config.Metadata != nil && c.config.Metadata.Project.ID != "" {
 		return c.searchIssuesWithProjectFields(fieldFilters, fieldExcludes, labelExcludes)
 	}
-	
+
 	// Fallback to original implementation for label-only filters
 	var repo string
 	if len(c.config.Repositories) > 0 {
 		repo = c.config.Repositories[0]
 	}
-	
+
 	fmt.Printf("Fetching issues from repository: %s\n", repo)
-	
+
 	// Get all open issues with labels
 	args := []string{"issue", "list", "--state=open", "--json", "number,title,id,url,labels"}
 	if repo != "" {
 		args = append(args, "--repo", repo)
 	}
-	
+
 	cmd := exec.Command("gh", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch issues: %w, output: %s", err, string(output))
 	}
-	
+
 	// Parse JSON output
 	var allIssues []struct {
 		Number int    `json:"number"`
@@ -562,11 +562,11 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 			Name string `json:"name"`
 		} `json:"labels"`
 	}
-	
+
 	if err := json.Unmarshal(output, &allIssues); err != nil {
 		return nil, fmt.Errorf("failed to parse issues: %w", err)
 	}
-	
+
 	// Filter based on query (for label-only filtering)
 	var filteredIssues []GitHubIssue
 	for _, issue := range allIssues {
@@ -592,7 +592,7 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 			})
 		}
 	}
-	
+
 	fmt.Printf("Found %d open issues, %d match query criteria\n", len(allIssues), len(filteredIssues))
 	return filteredIssues, nil
 }
@@ -603,18 +603,18 @@ func (c *TriageCommand) applyLabels(issueNumber int, labels []string) error {
 	if len(c.config.Repositories) > 0 {
 		repo = c.config.Repositories[0]
 	}
-	
+
 	// Build gh command to add labels
 	args := []string{"issue", "edit", fmt.Sprintf("%d", issueNumber), "--add-label", strings.Join(labels, ",")}
 	if repo != "" {
 		args = append(args, "--repo", repo)
 	}
-	
+
 	cmd := exec.Command("gh", args...)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to apply labels: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -627,15 +627,15 @@ func (c *TriageCommand) updateProjectField(projectID, itemID, fieldName, value s
 			break
 		}
 	}
-	
+
 	if targetField == nil {
 		return fmt.Errorf("field '%s' not found in project", fieldName)
 	}
-	
+
 	// For single select fields, find the option ID
 	if targetField.DataType == "SINGLE_SELECT" {
 		var optionID string
-		
+
 		// First try to use metadata for dynamic field lookup
 		if c.config.Metadata != nil && c.config.Metadata.Fields != nil {
 			// Find field metadata dynamically (case-insensitive)
@@ -652,12 +652,12 @@ func (c *TriageCommand) updateProjectField(projectID, itemID, fieldName, value s
 				}
 			}
 		}
-		
+
 		// If not found in metadata, fall back to config field mappings
 		if optionID == "" {
 			// Convert field name to config key (e.g., "Status" -> "status")
 			configKey := strings.ToLower(fieldName)
-			
+
 			if configField, ok := c.config.Fields[configKey]; ok {
 				// Use the configured mapping
 				if mappedValue, ok := configField.Values[value]; ok {
@@ -679,14 +679,14 @@ func (c *TriageCommand) updateProjectField(projectID, itemID, fieldName, value s
 				}
 			}
 		}
-		
+
 		if optionID == "" {
 			return fmt.Errorf("option '%s' not found for field '%s'", value, fieldName)
 		}
-		
+
 		return c.issueAPI.UpdateProjectItemField(projectID, itemID, targetField.ID, optionID)
 	}
-	
+
 	// For TEXT fields
 	if targetField.DataType == "TEXT" {
 		gql := c.issueAPI.GetGraphQLClient()
@@ -713,7 +713,7 @@ func (c *TriageCommand) updateProjectField(projectID, itemID, fieldName, value s
 		}
 		return nil
 	}
-	
+
 	// For NUMBER fields
 	if targetField.DataType == "NUMBER" {
 		// Try to parse the value as a number
@@ -733,7 +733,7 @@ func (c *TriageCommand) updateProjectField(projectID, itemID, fieldName, value s
 				}
 			}
 		}
-		
+
 		gql := c.issueAPI.GetGraphQLClient()
 		mutation := `
 			mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $number: Float!) {
@@ -758,29 +758,29 @@ func (c *TriageCommand) updateProjectField(projectID, itemID, fieldName, value s
 		}
 		return nil
 	}
-	
+
 	// For other field types, we'd need different handling
 	return fmt.Errorf("unsupported field type '%s' for field '%s'", targetField.DataType, fieldName)
 }
 
 // updateEstimateField updates the Estimate field (TEXT or NUMBER) on a project item
 func (c *TriageCommand) updateEstimateField(projectID, itemID, estimate string, fields []project.Field) error {
-    // Try to use the generic updateProjectField function first
-    // It now supports TEXT and NUMBER fields dynamically
-    
-    // Try "Estimate" field name first
-    err := c.updateProjectField(projectID, itemID, "Estimate", estimate, fields)
-    if err == nil {
-        return nil
-    }
-    
-    // If not found, try lowercase "estimate" as fallback
-    if strings.Contains(err.Error(), "not found") {
-        // Try with lowercase
-        return c.updateProjectField(projectID, itemID, "estimate", estimate, fields)
-    }
-    
-    return err
+	// Try to use the generic updateProjectField function first
+	// It now supports TEXT and NUMBER fields dynamically
+
+	// Try "Estimate" field name first
+	err := c.updateProjectField(projectID, itemID, "Estimate", estimate, fields)
+	if err == nil {
+		return nil
+	}
+
+	// If not found, try lowercase "estimate" as fallback
+	if strings.Contains(err.Error(), "not found") {
+		// Try with lowercase
+		return c.updateProjectField(projectID, itemID, "estimate", estimate, fields)
+	}
+
+	return err
 }
 
 func (c *TriageCommand) collectStatusChoice(issue GitHubIssue, reader *bufio.Reader, fields []project.Field) *string {
@@ -792,18 +792,18 @@ func (c *TriageCommand) collectStatusChoice(issue GitHubIssue, reader *bufio.Rea
 			break
 		}
 	}
-	
+
 	if statusField == nil {
 		fmt.Printf("Status field not found in project for issue #%d\n", issue.Number)
 		return nil
 	}
-	
+
 	fmt.Printf("\nSelect status for issue #%d: %s\n", issue.Number, issue.Title)
-	
+
 	// Get available status options from config mapping
 	var availableOptions []string
 	var configMapping map[string]string
-	
+
 	if statusFieldConfig, ok := c.config.Fields["status"]; ok {
 		configMapping = statusFieldConfig.Values
 		for key := range configMapping {
@@ -815,7 +815,7 @@ func (c *TriageCommand) collectStatusChoice(issue GitHubIssue, reader *bufio.Rea
 			availableOptions = append(availableOptions, option.Name)
 		}
 	}
-	
+
 	// Show options
 	for i, option := range availableOptions {
 		displayName := option
@@ -827,26 +827,26 @@ func (c *TriageCommand) collectStatusChoice(issue GitHubIssue, reader *bufio.Rea
 		fmt.Printf("  %d. %s\n", i+1, displayName)
 	}
 	fmt.Printf("  0. Skip\n")
-	
+
 	fmt.Print("Enter your choice (0-" + strconv.Itoa(len(availableOptions)) + "): ")
 	input, err := reader.ReadString('\n')
 	if err != nil {
 		fmt.Printf("Failed to read input: %v\n", err)
 		return nil
 	}
-	
+
 	input = strings.TrimSpace(input)
 	choice, err := strconv.Atoi(input)
 	if err != nil || choice < 0 || choice > len(availableOptions) {
 		fmt.Printf("Invalid choice, skipping status update for issue #%d\n", issue.Number)
 		return nil
 	}
-	
+
 	if choice == 0 {
 		fmt.Printf("Skipped status update for issue #%d\n", issue.Number)
 		return nil
 	}
-	
+
 	selectedStatus := availableOptions[choice-1]
 	return &selectedStatus
 }
@@ -854,19 +854,19 @@ func (c *TriageCommand) collectStatusChoice(issue GitHubIssue, reader *bufio.Rea
 func (c *TriageCommand) collectEstimateChoice(issue GitHubIssue, reader *bufio.Reader) *string {
 	fmt.Printf("\nEnter estimate for issue #%d: %s\n", issue.Number, issue.Title)
 	fmt.Print("Estimate (e.g., '2h', '1d', '3pts', or press Enter to skip): ")
-	
+
 	input, err := reader.ReadString('\n')
 	if err != nil {
 		fmt.Printf("Failed to read input: %v\n", err)
 		return nil
 	}
-	
+
 	input = strings.TrimSpace(input)
 	if input == "" {
 		fmt.Printf("Skipped estimate for issue #%d\n", issue.Number)
 		return nil
 	}
-	
+
 	return &input
 }
 
@@ -879,21 +879,21 @@ func (c *TriageCommand) collectFieldChoice(issue GitHubIssue, reader *bufio.Read
 			break
 		}
 	}
-	
+
 	if targetField == nil {
 		fmt.Printf("Field '%s' not found in project for issue #%d\n", fieldName, issue.Number)
 		return nil
 	}
-	
+
 	fmt.Printf("\nSelect %s for issue #%d: %s\n", fieldName, issue.Number, issue.Title)
-	
+
 	// Handle different field types
 	switch targetField.DataType {
 	case "SINGLE_SELECT":
 		// Get available options
 		var availableOptions []string
 		var configMapping map[string]string
-		
+
 		// Check if there's a config mapping for this field
 		if fieldConfig, ok := c.config.Fields[strings.ToLower(fieldName)]; ok {
 			configMapping = fieldConfig.Values
@@ -906,7 +906,7 @@ func (c *TriageCommand) collectFieldChoice(issue GitHubIssue, reader *bufio.Read
 				availableOptions = append(availableOptions, option.Name)
 			}
 		}
-		
+
 		// Show options
 		for i, option := range availableOptions {
 			displayName := option
@@ -918,29 +918,29 @@ func (c *TriageCommand) collectFieldChoice(issue GitHubIssue, reader *bufio.Read
 			fmt.Printf("  %d. %s\n", i+1, displayName)
 		}
 		fmt.Printf("  0. Skip\n")
-		
+
 		fmt.Print("Enter your choice (0-" + strconv.Itoa(len(availableOptions)) + "): ")
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			fmt.Printf("Failed to read input: %v\n", err)
 			return nil
 		}
-		
+
 		input = strings.TrimSpace(input)
 		choice, err := strconv.Atoi(input)
 		if err != nil || choice < 0 || choice > len(availableOptions) {
 			fmt.Printf("Invalid choice, skipping %s update for issue #%d\n", fieldName, issue.Number)
 			return nil
 		}
-		
+
 		if choice == 0 {
 			fmt.Printf("Skipped %s update for issue #%d\n", fieldName, issue.Number)
 			return nil
 		}
-		
+
 		selectedValue := availableOptions[choice-1]
 		return &selectedValue
-		
+
 	case "TEXT", "NUMBER":
 		// For text or number fields, accept free-form input
 		fmt.Printf("Enter %s value (or press Enter to skip): ", fieldName)
@@ -949,15 +949,15 @@ func (c *TriageCommand) collectFieldChoice(issue GitHubIssue, reader *bufio.Read
 			fmt.Printf("Failed to read input: %v\n", err)
 			return nil
 		}
-		
+
 		input = strings.TrimSpace(input)
 		if input == "" {
 			fmt.Printf("Skipped %s for issue #%d\n", fieldName, issue.Number)
 			return nil
 		}
-		
+
 		return &input
-		
+
 	default:
 		fmt.Printf("Field '%s' has type '%s' which is not yet supported for interactive mode\n", fieldName, targetField.DataType)
 		fmt.Printf("Currently supported types: SINGLE_SELECT, TEXT, NUMBER\n")
@@ -965,10 +965,9 @@ func (c *TriageCommand) collectFieldChoice(issue GitHubIssue, reader *bufio.Read
 	}
 }
 
-
 func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]string, fieldExcludes map[string]bool, labelExcludes []string) ([]GitHubIssue, error) {
 	projectID := c.config.Metadata.Project.ID
-	
+
 	// Build GraphQL query to get all project items with field values
 	query := `
 		query($projectId: ID!, $endCursor: String) {
@@ -1033,13 +1032,13 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 				}
 			}
 		}`
-	
+
 	var allItems []GitHubIssue
 	var endCursor *string
-	
+
 	// Prepare field option IDs to filter by
 	filterOptionIDs := make(map[string]string) // fieldID -> optionID
-	
+
 	// Map field filters to option IDs using metadata dynamically
 	for fieldName, filterValue := range fieldFilters {
 		if fieldMeta := c.config.GetFieldMetadata(fieldName); fieldMeta != nil && filterValue != "" {
@@ -1048,9 +1047,9 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 			}
 		}
 	}
-	
+
 	fmt.Printf("Fetching project items with field values...\n")
-	
+
 	// Paginate through all project items
 	for {
 		variables := map[string]interface{}{
@@ -1059,7 +1058,7 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 		if endCursor != nil {
 			variables["endCursor"] = *endCursor
 		}
-		
+
 		var result struct {
 			Node struct {
 				Items struct {
@@ -1089,19 +1088,19 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 				} `json:"items"`
 			} `json:"node"`
 		}
-		
+
 		err := c.issueAPI.GetGraphQLClient().Do(query, variables, &result)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch project items: %w", err)
 		}
-		
+
 		// Process items
 		for _, item := range result.Node.Items.Nodes {
 			// Skip if not an issue or closed
 			if item.Content.Number == 0 || item.Content.State != "OPEN" {
 				continue
 			}
-			
+
 			// Check label exclusions
 			skipItem := false
 			for _, excludeLabel := range labelExcludes {
@@ -1118,7 +1117,7 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 			if skipItem {
 				continue
 			}
-			
+
 			// Build a map of field values for this item
 			itemFieldValues := make(map[string]interface{})
 			for _, fieldValueNode := range item.FieldValues.Nodes {
@@ -1140,7 +1139,7 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 					}
 				}
 			}
-			
+
 			// Check field filters
 			matchesAllFilters := true
 			for fieldID, requiredOptionID := range filterOptionIDs {
@@ -1154,7 +1153,7 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 					break
 				}
 			}
-			
+
 			// Check field exclusions (e.g., -has:estimate)
 			if matchesAllFilters {
 				for excludeFieldName := range fieldExcludes {
@@ -1184,7 +1183,7 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 					}
 				}
 			}
-			
+
 			if matchesAllFilters {
 				allItems = append(allItems, GitHubIssue{
 					Number: item.Content.Number,
@@ -1194,18 +1193,17 @@ func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]st
 				})
 			}
 		}
-		
+
 		// Check if there are more pages
 		if !result.Node.Items.PageInfo.HasNextPage {
 			break
 		}
 		endCursor = &result.Node.Items.PageInfo.EndCursor
 	}
-	
+
 	fmt.Printf("Found %d issues matching criteria\n", len(allItems))
 	return allItems, nil
 }
-
 
 func (c *TriageCommand) displayIssuesList(issues []GitHubIssue, triageConfig config.TriageConfig) error {
 	// Display instruction if configured
@@ -1213,11 +1211,11 @@ func (c *TriageCommand) displayIssuesList(issues []GitHubIssue, triageConfig con
 		// Use dim cyan for instruction
 		fmt.Printf("\033[36m%s\033[0m\n\n", triageConfig.Instruction)
 	}
-	
+
 	// Display issues that would be affected
 	for i, issue := range issues {
 		fmt.Printf("%d. #%d: %s\n", i+1, issue.Number, issue.Title)
-		
+
 		// Try to get project URL
 		projectID := c.config.GetProjectID()
 		if projectID != "" {
@@ -1234,14 +1232,14 @@ func (c *TriageCommand) displayIssuesList(issues []GitHubIssue, triageConfig con
 			fmt.Printf("   URL: %s\n", issue.URL)
 		}
 	}
-	
+
 	fmt.Printf("\nWould apply the following changes:\n")
-	
+
 	// Show labels that would be applied
 	if len(triageConfig.Apply.Labels) > 0 {
 		fmt.Printf("- Labels: %s\n", strings.Join(triageConfig.Apply.Labels, ", "))
 	}
-	
+
 	// Show fields that would be updated
 	if len(triageConfig.Apply.Fields) > 0 {
 		fmt.Printf("- Fields:\n")
@@ -1256,7 +1254,7 @@ func (c *TriageCommand) displayIssuesList(issues []GitHubIssue, triageConfig con
 			fmt.Printf("  - %s: %s\n", fieldName, fieldValue)
 		}
 	}
-	
+
 	// Show interactive options
 	if triageConfig.Interactive.Status || triageConfig.Interactive.Estimate || len(triageConfig.InteractiveFields) > 0 {
 		fmt.Printf("- Interactive fields:\n")
@@ -1270,14 +1268,14 @@ func (c *TriageCommand) displayIssuesList(issues []GitHubIssue, triageConfig con
 			fmt.Printf("  - %s (will prompt for each issue)\n", strings.Title(fieldName))
 		}
 	}
-	
-	if len(triageConfig.Apply.Labels) == 0 && len(triageConfig.Apply.Fields) == 0 && 
-		!triageConfig.Interactive.Status && !triageConfig.Interactive.Estimate && 
+
+	if len(triageConfig.Apply.Labels) == 0 && len(triageConfig.Apply.Fields) == 0 &&
+		!triageConfig.Interactive.Status && !triageConfig.Interactive.Estimate &&
 		len(triageConfig.InteractiveFields) == 0 {
 		fmt.Printf("- No changes configured\n")
 	}
-	
+
 	fmt.Printf("\nTo execute these changes, run without --list or --dry-run flags.\n")
-	
+
 	return nil
 }

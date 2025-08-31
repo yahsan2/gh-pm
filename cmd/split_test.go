@@ -144,7 +144,7 @@ func TestExtractTasksFromFile(t *testing.T) {
 	// Create a temporary file with test content
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "tasks.md")
-	
+
 	content := `# Test Tasks
 - [ ] Task 1
 - [ ] Task 2
@@ -268,12 +268,12 @@ func TestSplitCommandValidation(t *testing.T) {
 func TestRunSplitDryRun(t *testing.T) {
 	// This test would require mocking the GitHub API
 	// For now, we just test that dry-run mode skips the extension check
-	
+
 	oldDryRun := splitDryRun
 	defer func() { splitDryRun = oldDryRun }()
-	
+
 	splitDryRun = true
-	
+
 	// In dry-run mode, the extension check should be skipped
 	// This is a simplified test that would need proper mocking for full coverage
 	t.Run("dry-run skips extension check", func(t *testing.T) {

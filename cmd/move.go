@@ -44,23 +44,23 @@ var (
 
 func init() {
 	rootCmd.AddCommand(moveCmd)
-	
+
 	// Field update flags
 	moveCmd.Flags().StringVar(&moveStatus, "status", "", "New status for the issue")
 	moveCmd.Flags().StringVar(&movePriority, "priority", "", "New priority for the issue")
-	
+
 	// Repository selection
 	moveCmd.Flags().StringVarP(&moveRepo, "repo", "r", "", "Repository (owner/repo format)")
-	
+
 	// Output control
 	moveCmd.Flags().BoolVarP(&moveQuiet, "quiet", "q", false, "Only output essential information")
 }
 
 type MoveCommand struct {
-	config      *config.Config
+	config        *config.Config
 	projectClient *project.Client
-	issueClient *issue.Client
-	formatter   *output.Formatter
+	issueClient   *issue.Client
+	formatter     *output.Formatter
 }
 
 func runMove(cmd *cobra.Command, args []string) error {
@@ -69,31 +69,31 @@ func runMove(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("invalid issue number '%s': must be a number", args[0])
 	}
-	
+
 	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w\nRun 'gh pm init' to create a configuration file", err)
 	}
-	
+
 	// Validate configuration
 	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("invalid configuration: %w", err)
 	}
-	
+
 	// Check that at least one field update was specified
 	if moveStatus == "" && movePriority == "" {
 		return fmt.Errorf("no field updates specified. Use --status or --priority flags")
 	}
-	
+
 	// Create clients
 	projectClient, err := project.NewClient()
 	if err != nil {
 		return fmt.Errorf("failed to create project client: %w", err)
 	}
-	
+
 	issueClient := issue.NewClient()
-	
+
 	// Create output formatter
 	formatType := output.FormatTable // Default
 	if moveQuiet {
@@ -103,9 +103,9 @@ func runMove(cmd *cobra.Command, args []string) error {
 	} else if outputFormat == "csv" {
 		formatType = output.FormatCSV
 	}
-	
+
 	formatter := output.NewFormatter(formatType)
-	
+
 	// Create command executor
 	command := &MoveCommand{
 		config:        cfg,
@@ -113,7 +113,7 @@ func runMove(cmd *cobra.Command, args []string) error {
 		issueClient:   issueClient,
 		formatter:     formatter,
 	}
-	
+
 	// Execute the move operation
 	return command.Execute(issueNumber)
 }
@@ -121,20 +121,20 @@ func runMove(cmd *cobra.Command, args []string) error {
 func (c *MoveCommand) Execute(issueNumber int) error {
 	// Select repository
 	repo := c.selectRepository()
-	
+
 	// Get issue details
 	currentIssue, err := issue.GetIssueDetails(issueNumber, repo)
 	if err != nil {
 		return fmt.Errorf("failed to get issue details: %w", err)
 	}
-	
+
 	// Get project ID
 	projectID := c.config.GetProjectID()
 	if projectID == "" {
 		// Fetch project ID if not cached
 		var proj *project.Project
 		var err error
-		
+
 		// Check if it's an organization or user project
 		if c.config.Project.Org != "" {
 			proj, err = c.projectClient.GetProject(
@@ -149,31 +149,31 @@ func (c *MoveCommand) Execute(issueNumber int) error {
 				c.config.Project.Number,
 			)
 		}
-		
+
 		if err != nil {
 			return fmt.Errorf("failed to get project: %w", err)
 		}
 		projectID = proj.ID
-		
+
 		// Cache the project ID
 		c.config.SetProjectID(projectID)
 	}
-	
+
 	// Get project item for this issue
 	projectItem, err := c.projectClient.GetProjectItemForIssue(projectID, currentIssue.ID)
 	if err != nil {
 		return fmt.Errorf("failed to find issue in project (make sure issue %d is added to the project): %w", issueNumber, err)
 	}
-	
+
 	// Get project fields to map field names to IDs
 	fields, err := c.projectClient.GetFieldsWithOptions(projectID)
 	if err != nil {
 		return fmt.Errorf("failed to get project fields: %w", err)
 	}
-	
+
 	// Track changes made
 	var updatesApplied []string
-	
+
 	// Update Status field if specified
 	if moveStatus != "" {
 		if err := c.updateProjectField(projectID, projectItem.ID, "Status", moveStatus, fields); err != nil {
@@ -181,7 +181,7 @@ func (c *MoveCommand) Execute(issueNumber int) error {
 		}
 		updatesApplied = append(updatesApplied, fmt.Sprintf("Status → %s", moveStatus))
 	}
-	
+
 	// Update Priority field if specified
 	if movePriority != "" {
 		if err := c.updateProjectField(projectID, projectItem.ID, "Priority", movePriority, fields); err != nil {
@@ -189,7 +189,7 @@ func (c *MoveCommand) Execute(issueNumber int) error {
 		}
 		updatesApplied = append(updatesApplied, fmt.Sprintf("Priority → %s", movePriority))
 	}
-	
+
 	// Prepare success output
 	if !moveQuiet {
 		fmt.Printf("✓ Updated issue #%d: %s\n", issueNumber, currentIssue.Title)
@@ -200,7 +200,7 @@ func (c *MoveCommand) Execute(issueNumber int) error {
 	} else {
 		fmt.Printf("Updated issue #%d\n", issueNumber)
 	}
-	
+
 	return nil
 }
 
@@ -209,12 +209,12 @@ func (c *MoveCommand) selectRepository() string {
 	if moveRepo != "" {
 		return moveRepo
 	}
-	
+
 	// Use first repository from config
 	if len(c.config.Repositories) > 0 {
 		return c.config.Repositories[0]
 	}
-	
+
 	return ""
 }
 
@@ -228,11 +228,11 @@ func (c *MoveCommand) updateProjectField(projectID, itemID, fieldName, value str
 			break
 		}
 	}
-	
+
 	if targetField == nil {
 		return fmt.Errorf("field '%s' not found in project", fieldName)
 	}
-	
+
 	// For single select fields, find the option ID
 	if targetField.DataType == "SINGLE_SELECT" {
 		var optionID string
@@ -272,14 +272,14 @@ func (c *MoveCommand) updateProjectField(projectID, itemID, fieldName, value str
 				}
 			}
 		}
-		
+
 		if optionID == "" {
 			return fmt.Errorf("option '%s' not found for field '%s'", value, fieldName)
 		}
-		
+
 		return c.issueClient.UpdateProjectItemField(projectID, itemID, targetField.ID, optionID)
 	}
-	
+
 	// For other field types, we'd need different handling
 	return fmt.Errorf("unsupported field type '%s' for field '%s'", targetField.DataType, fieldName)
 }
@@ -297,7 +297,7 @@ func (c *MoveCommand) validateFlags() error {
 			}
 		}
 	}
-	
+
 	// Validate priority if provided
 	if movePriority != "" {
 		if field, ok := c.config.Fields["priority"]; ok {
@@ -310,6 +310,6 @@ func (c *MoveCommand) validateFlags() error {
 			}
 		}
 	}
-	
+
 	return nil
 }

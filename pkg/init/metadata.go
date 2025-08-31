@@ -35,7 +35,7 @@ func (m *MetadataManager) FetchFieldMetadata(projectID string, fieldName string)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch project fields: %w", err)
 	}
-	
+
 	// Find the specific field
 	for _, field := range fields {
 		if strings.EqualFold(field.Name, fieldName) {
@@ -43,7 +43,7 @@ func (m *MetadataManager) FetchFieldMetadata(projectID string, fieldName string)
 			if field.DataType != "SINGLE_SELECT" || len(field.Options) == 0 {
 				continue
 			}
-			
+
 			// Build option ID mapping
 			options := make(map[string]string)
 			for _, opt := range field.Options {
@@ -53,14 +53,14 @@ func (m *MetadataManager) FetchFieldMetadata(projectID string, fieldName string)
 				key = strings.ReplaceAll(key, " ", "_")
 				options[key] = opt.ID
 			}
-			
+
 			return &config.FieldMetadata{
 				ID:      field.ID,
 				Options: options,
 			}, nil
 		}
 	}
-	
+
 	return nil, fmt.Errorf("field '%s' not found or is not a single select field", fieldName)
 }
 
@@ -69,15 +69,14 @@ func (m *MetadataManager) BuildMetadata(proj *project.Project, fields []project.
 	if proj == nil {
 		return nil, fmt.Errorf("project is nil")
 	}
-	
+
 	metadata := &config.ConfigMetadata{
 		Project: config.ProjectMetadata{
 			ID: proj.ID,
 		},
 		Fields: make([]config.FieldInfo, 0, len(fields)),
 	}
-	
-	
+
 	// Cache ALL fields information for future reference
 	for _, field := range fields {
 		// Store all field information
@@ -86,7 +85,7 @@ func (m *MetadataManager) BuildMetadata(proj *project.Project, fields []project.
 			ID:       field.ID,
 			DataType: field.DataType,
 		}
-		
+
 		// If it's a single select field, also store the options
 		if field.DataType == "SINGLE_SELECT" && len(field.Options) > 0 {
 			fieldInfo.Options = make([]config.FieldOption, 0, len(field.Options))
@@ -96,12 +95,11 @@ func (m *MetadataManager) BuildMetadata(proj *project.Project, fields []project.
 					ID:   opt.ID,
 				})
 			}
-			
+
 		}
-		
+
 		metadata.Fields = append(metadata.Fields, fieldInfo)
 	}
-	
+
 	return metadata, nil
 }
-

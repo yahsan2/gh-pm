@@ -36,22 +36,22 @@ type IssueError struct {
 // Error implements the error interface
 func (e *IssueError) Error() string {
 	var parts []string
-	
+
 	// Add main message
 	if e.Message != "" {
 		parts = append(parts, e.Message)
 	}
-	
+
 	// Add cause if present
 	if e.Cause != nil {
 		parts = append(parts, fmt.Sprintf("caused by: %v", e.Cause))
 	}
-	
+
 	// Add suggestion if present
 	if e.Suggestion != "" {
 		parts = append(parts, fmt.Sprintf("\n💡 %s", e.Suggestion))
 	}
-	
+
 	return strings.Join(parts, ": ")
 }
 
@@ -148,7 +148,7 @@ func WrapError(err error, message string) *IssueError {
 			Suggestion: issueErr.Suggestion,
 		}
 	}
-	
+
 	// Otherwise, create a generic API error
 	return NewAPIError(message, err)
 }

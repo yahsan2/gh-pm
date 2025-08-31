@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	
+
 	"github.com/cli/go-gh/v2/pkg/api"
 )
 
@@ -22,7 +22,7 @@ type Client struct {
 func NewClient() *Client {
 	restClient, _ := api.DefaultRESTClient()
 	gqlClient, _ := api.DefaultGraphQLClient()
-	
+
 	return &Client{
 		rest: restClient,
 		gql:  gqlClient,
@@ -52,12 +52,12 @@ func (c *Client) AddToProject(issueID, projectID string) (string, error) {
 				}
 			}
 		}`
-	
+
 	variables := map[string]interface{}{
 		"projectId": projectID,
 		"contentId": issueID,
 	}
-	
+
 	var result struct {
 		AddProjectV2ItemById struct {
 			Item struct {
@@ -66,12 +66,12 @@ func (c *Client) AddToProject(issueID, projectID string) (string, error) {
 			} `json:"item"`
 		} `json:"addProjectV2ItemById"`
 	}
-	
+
 	err := c.gql.Do(mutation, variables, &result)
 	if err != nil {
 		return "", NewAPIError("failed to add issue to project", err)
 	}
-	
+
 	return result.AddProjectV2ItemById.Item.ID, nil
 }
 
@@ -87,12 +87,12 @@ func (c *Client) AddToProjectWithDatabaseID(issueID, projectID string) (string, 
 				}
 			}
 		}`
-	
+
 	variables := map[string]interface{}{
 		"projectId": projectID,
 		"contentId": issueID,
 	}
-	
+
 	var result struct {
 		AddProjectV2ItemById struct {
 			Item struct {
@@ -101,12 +101,12 @@ func (c *Client) AddToProjectWithDatabaseID(issueID, projectID string) (string, 
 			} `json:"item"`
 		} `json:"addProjectV2ItemById"`
 	}
-	
+
 	err := c.gql.Do(mutation, variables, &result)
 	if err != nil {
 		return "", 0, NewAPIError("failed to add issue to project", err)
 	}
-	
+
 	return result.AddProjectV2ItemById.Item.ID, result.AddProjectV2ItemById.Item.DatabaseID, nil
 }
 
@@ -127,14 +127,14 @@ func (c *Client) UpdateProjectItemField(projectID, itemID, fieldID, optionID str
 				}
 			}
 		}`
-	
+
 	variables := map[string]interface{}{
 		"projectId": projectID,
 		"itemId":    itemID,
 		"fieldId":   fieldID,
 		"optionId":  optionID,
 	}
-	
+
 	var result struct {
 		UpdateProjectV2ItemFieldValue struct {
 			ProjectV2Item struct {
@@ -142,11 +142,11 @@ func (c *Client) UpdateProjectItemField(projectID, itemID, fieldID, optionID str
 			} `json:"projectV2Item"`
 		} `json:"updateProjectV2ItemFieldValue"`
 	}
-	
+
 	if err := c.gql.Do(mutation, variables, &result); err != nil {
 		return NewAPIError(fmt.Sprintf("failed to update field %s", fieldID), err)
 	}
-	
+
 	return nil
 }
 
@@ -168,11 +168,11 @@ func (c *Client) GetProjectItemID(issueID, projectID string) (string, int, error
 				}
 			}
 		}`
-	
+
 	variables := map[string]interface{}{
 		"issueId": issueID,
 	}
-	
+
 	var result struct {
 		Node struct {
 			ProjectItems struct {
@@ -186,39 +186,39 @@ func (c *Client) GetProjectItemID(issueID, projectID string) (string, int, error
 			} `json:"projectItems"`
 		} `json:"node"`
 	}
-	
+
 	err := c.gql.Do(query, variables, &result)
 	if err != nil {
 		return "", 0, NewAPIError("failed to get project item", err)
 	}
-	
+
 	// Find the item for the specified project
 	for _, item := range result.Node.ProjectItems.Nodes {
 		if item.Project.ID == projectID {
 			return item.ID, item.DatabaseID, nil
 		}
 	}
-	
+
 	return "", 0, nil // Not found in project
 }
 
 // GetIssueDetails fetches issue details using gh issue view command
 func GetIssueDetails(number int, repo string) (*Issue, error) {
 	args := []string{"issue", "view", strconv.Itoa(number), "--json", "id,number,title,body,url,state,createdAt,updatedAt,labels"}
-	
+
 	if repo != "" {
 		args = append(args, "--repo", repo)
 	}
-	
+
 	cmd := exec.Command("gh", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("failed to get issue details: %w\nstderr: %s", err, stderr.String())
 	}
-	
+
 	var result struct {
 		ID        string    `json:"id"`
 		Number    int       `json:"number"`
@@ -233,11 +233,11 @@ func GetIssueDetails(number int, repo string) (*Issue, error) {
 			Color string `json:"color"`
 		} `json:"labels"`
 	}
-	
+
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		return nil, fmt.Errorf("failed to parse gh output: %w", err)
 	}
-	
+
 	// Convert labels
 	labels := make([]Label, len(result.Labels))
 	for i, l := range result.Labels {
@@ -246,7 +246,7 @@ func GetIssueDetails(number int, repo string) (*Issue, error) {
 			Color: l.Color,
 		}
 	}
-	
+
 	return &Issue{
 		ID:         result.ID,
 		Number:     result.Number,
@@ -272,24 +272,24 @@ func (c *Client) GetIssueWithRepo(number int, repo string) (Issue, error) {
 	if repo != "" {
 		args = append(args, "--repo", repo)
 	}
-	
+
 	cmd := exec.Command("gh", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		return Issue{}, fmt.Errorf("failed to get issue: %w\nstderr: %s", err, stderr.String())
 	}
-	
+
 	var result struct {
-		ID        string    `json:"id"`
-		Number    int       `json:"number"`
-		Title     string    `json:"title"`
-		Body      string    `json:"body"`
-		URL       string    `json:"url"`
-		State     string    `json:"state"`
-		Labels    []struct {
+		ID     string `json:"id"`
+		Number int    `json:"number"`
+		Title  string `json:"title"`
+		Body   string `json:"body"`
+		URL    string `json:"url"`
+		State  string `json:"state"`
+		Labels []struct {
 			Name  string `json:"name"`
 			Color string `json:"color"`
 		} `json:"labels"`
@@ -300,11 +300,11 @@ func (c *Client) GetIssueWithRepo(number int, repo string) (Issue, error) {
 			Title string `json:"title"`
 		} `json:"milestone"`
 	}
-	
+
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		return Issue{}, fmt.Errorf("failed to parse issue: %w", err)
 	}
-	
+
 	labels := make([]Label, len(result.Labels))
 	for i, l := range result.Labels {
 		labels[i] = Label{
@@ -312,12 +312,12 @@ func (c *Client) GetIssueWithRepo(number int, repo string) (Issue, error) {
 			Color: l.Color,
 		}
 	}
-	
+
 	assignees := make([]string, len(result.Assignees))
 	for i, a := range result.Assignees {
 		assignees[i] = a.Login
 	}
-	
+
 	return Issue{
 		ID:        result.ID,
 		Number:    result.Number,
@@ -339,54 +339,54 @@ func (c *Client) CreateIssue(req IssueRequest) (Issue, error) {
 // CreateIssueWithRepo creates a new issue in a specific repo
 func (c *Client) CreateIssueWithRepo(req IssueRequest, repo string) (Issue, error) {
 	args := []string{"issue", "create", "--title", req.Title}
-	
+
 	if req.Body != "" {
 		args = append(args, "--body", req.Body)
 	}
-	
+
 	for _, label := range req.Labels {
 		args = append(args, "--label", label)
 	}
-	
+
 	for _, assignee := range req.Assignees {
 		args = append(args, "--assignee", assignee)
 	}
-	
+
 	if req.Milestone != "" {
 		args = append(args, "--milestone", req.Milestone)
 	}
-	
+
 	if repo != "" {
 		args = append(args, "--repo", repo)
 	}
-	
+
 	cmd := exec.Command("gh", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		return Issue{}, fmt.Errorf("failed to create issue: %w\nstderr: %s", err, stderr.String())
 	}
-	
+
 	// Parse the URL from output
 	output := strings.TrimSpace(stdout.String())
 	if output == "" {
 		return Issue{}, fmt.Errorf("no output from gh issue create")
 	}
-	
+
 	// Extract issue number from URL (format: https://github.com/owner/repo/issues/123)
 	parts := strings.Split(output, "/")
 	if len(parts) < 2 {
 		return Issue{}, fmt.Errorf("unexpected output format: %s", output)
 	}
-	
+
 	numberStr := parts[len(parts)-1]
 	number, err := strconv.Atoi(numberStr)
 	if err != nil {
 		return Issue{}, fmt.Errorf("failed to parse issue number from URL: %s", output)
 	}
-	
+
 	return Issue{
 		Number: number,
 		Title:  req.Title,
@@ -402,15 +402,15 @@ func (c *Client) UpdateIssue(number int, req IssueRequest) error {
 // UpdateIssueWithRepo updates an existing issue in a specific repo
 func (c *Client) UpdateIssueWithRepo(number int, req IssueRequest, repo string) error {
 	args := []string{"issue", "edit", strconv.Itoa(number)}
-	
+
 	if req.Title != "" {
 		args = append(args, "--title", req.Title)
 	}
-	
+
 	if req.Body != "" {
 		args = append(args, "--body", req.Body)
 	}
-	
+
 	if len(req.Labels) > 0 {
 		// Clear existing labels and add new ones
 		args = append(args, "--remove-label", "*")
@@ -418,18 +418,19 @@ func (c *Client) UpdateIssueWithRepo(number int, req IssueRequest, repo string) 
 			args = append(args, "--add-label", label)
 		}
 	}
-	
+
 	if repo != "" {
 		args = append(args, "--repo", repo)
 	}
-	
+
 	cmd := exec.Command("gh", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to update issue: %w\nstderr: %s", err, stderr.String())
 	}
-	
+
 	return nil
 }
+

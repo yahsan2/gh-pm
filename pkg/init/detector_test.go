@@ -26,13 +26,13 @@ func (m *MockProjectClient) ListProjects(org string) ([]project.Project, error) 
 
 func TestProjectDetector_ListRepoProjects(t *testing.T) {
 	tests := []struct {
-		name        string
-		org         string
-		repo        string
+		name         string
+		org          string
+		repo         string
 		mockProjects []project.Project
-		mockError   error
+		mockError    error
 		wantProjects []project.Project
-		wantError   bool
+		wantError    bool
 	}{
 		{
 			name: "successful project listing",
@@ -66,13 +66,13 @@ func TestProjectDetector_ListRepoProjects(t *testing.T) {
 			wantError:    true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Note: This test is simplified because we can't easily mock the actual client
 			// In a real scenario, we would need to refactor ProjectDetector to accept an interface
 			// For now, we're testing the logic conceptually
-			
+
 			if tt.mockError != nil {
 				assert.NotNil(t, tt.mockError)
 			} else {
@@ -84,12 +84,12 @@ func TestProjectDetector_ListRepoProjects(t *testing.T) {
 
 func TestProjectDetector_ListOrgProjects(t *testing.T) {
 	tests := []struct {
-		name        string
-		org         string
+		name         string
+		org          string
 		mockProjects []project.Project
-		mockError   error
+		mockError    error
 		wantProjects []project.Project
-		wantError   bool
+		wantError    bool
 	}{
 		{
 			name: "successful org project listing",
@@ -115,7 +115,7 @@ func TestProjectDetector_ListOrgProjects(t *testing.T) {
 			wantError:    true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Similar simplified test as above

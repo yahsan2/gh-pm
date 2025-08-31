@@ -15,7 +15,7 @@ type IssueData struct {
 	Priority     string            `yaml:"priority" json:"priority"`
 	Status       string            `yaml:"status" json:"status"`
 	CustomFields map[string]string `yaml:"custom_fields" json:"custom_fields"`
-	
+
 	// Pass-through fields for gh issue create compatibility
 	Assignee  string `yaml:"assignee" json:"assignee"`
 	Milestone string `yaml:"milestone" json:"milestone"`
@@ -77,21 +77,21 @@ func (d *IssueData) Validate() error {
 	if d.Title == "" {
 		return fmt.Errorf("issue title is required")
 	}
-	
+
 	if len(d.Title) > 256 {
 		return fmt.Errorf("issue title must be 256 characters or less")
 	}
-	
+
 	if d.Repository == "" {
 		return fmt.Errorf("repository is required")
 	}
-	
+
 	// Validate repository format (owner/repo)
 	parts := strings.Split(d.Repository, "/")
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return fmt.Errorf("repository must be in 'owner/repo' format")
 	}
-	
+
 	// Validate labels
 	for _, label := range d.Labels {
 		if label == "" {
@@ -101,7 +101,7 @@ func (d *IssueData) Validate() error {
 			return fmt.Errorf("label '%s' exceeds maximum length of 50 characters", label)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -128,42 +128,43 @@ func (d *IssueData) ToCreateRequest() map[string]interface{} {
 	req := map[string]interface{}{
 		"title": d.Title,
 	}
-	
+
 	if d.Body != "" {
 		req["body"] = d.Body
 	}
-	
+
 	if len(d.Labels) > 0 {
 		req["labels"] = d.Labels
 	}
-	
+
 	if d.Assignee != "" {
 		req["assignees"] = []string{d.Assignee}
 	}
-	
+
 	if d.Milestone != "" {
 		req["milestone"] = d.Milestone
 	}
-	
+
 	return req
 }
 
 // GetFieldUpdates returns project field updates
 func (d *IssueData) GetFieldUpdates() map[string]interface{} {
 	fields := make(map[string]interface{})
-	
+
 	if d.Priority != "" {
 		fields["priority"] = d.Priority
 	}
-	
+
 	if d.Status != "" {
 		fields["status"] = d.Status
 	}
-	
+
 	// Add custom fields
 	for key, value := range d.CustomFields {
 		fields[key] = value
 	}
-	
+
 	return fields
 }
+

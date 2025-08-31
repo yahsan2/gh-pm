@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	splitFrom  string
-	splitRepo  string
+	splitFrom   string
+	splitRepo   string
 	splitDryRun bool
 )
 
@@ -87,13 +87,13 @@ func getExistingSubIssues(parentIssueNum int, repo string) ([]SubIssueInfo, erro
 	if repo != "" {
 		args = append(args, "--repo", repo)
 	}
-	
+
 	cmd := exec.Command("gh", args...)
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var subIssues []SubIssueInfo
 	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
@@ -101,7 +101,7 @@ func getExistingSubIssues(parentIssueNum int, repo string) ([]SubIssueInfo, erro
 		if line == "" {
 			continue
 		}
-		
+
 		// Parse format: "123	open	Title of issue"
 		parts := strings.Split(line, "\t")
 		if len(parts) >= 3 {
@@ -113,7 +113,7 @@ func getExistingSubIssues(parentIssueNum int, repo string) ([]SubIssueInfo, erro
 			})
 		}
 	}
-	
+
 	return subIssues, nil
 }
 
@@ -144,7 +144,7 @@ func runSplit(cmd *cobra.Command, args []string) error {
 		fmt.Println("\nFor more information, visit: https://github.com/yahsan2/gh-sub-issue")
 		return fmt.Errorf("gh sub-issue extension is required")
 	}
-	
+
 	// Parse issue number
 	issueNum, err := strconv.Atoi(args[0])
 	if err != nil {
@@ -153,7 +153,7 @@ func runSplit(cmd *cobra.Command, args []string) error {
 
 	// Get tasks based on input method
 	var tasks []string
-	
+
 	if splitFrom == "body" {
 		// Extract from issue body
 		tasks, err = extractTasksFromIssueBody(issueNum, splitRepo)
@@ -200,7 +200,7 @@ func runSplit(cmd *cobra.Command, args []string) error {
 	} else {
 		fmt.Printf("Checking for existing sub-issues and creating new ones for issue #%d...\n", issueNum)
 	}
-	
+
 	client := issue.NewClient()
 	parentIssue, err := client.GetIssueWithRepo(issueNum, splitRepo)
 	if err != nil {
@@ -215,7 +215,7 @@ func runSplit(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(os.Stderr, "Warning: failed to get existing sub-issues: %v\n", err)
 			// Continue anyway, but might create duplicates
 		}
-		
+
 		if len(existingSubIssues) > 0 {
 			fmt.Printf("Found %d existing sub-issues for issue #%d\n", len(existingSubIssues), issueNum)
 		}
@@ -224,7 +224,7 @@ func runSplit(cmd *cobra.Command, args []string) error {
 	createdIssues := []issue.Issue{}
 	skippedCount := 0
 	wouldCreateCount := 0
-	
+
 	if splitDryRun {
 		// Dry-run mode: show what would be created
 		fmt.Println("Parent Issue:")
@@ -247,11 +247,11 @@ func runSplit(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Println("\nSub-issues that would be created:")
 		fmt.Println("─────────────────────────────────")
-		
+
 		for _, task := range tasks {
 			wouldCreateCount++
 			fmt.Printf("  %d. %s\n", wouldCreateCount, task)
-			
+
 			// Show what would be inherited
 			inheritedItems := []string{}
 			if len(parentIssue.Labels) > 0 {
@@ -271,16 +271,16 @@ func runSplit(cmd *cobra.Command, args []string) error {
 			if parentIssue.Milestone != "" {
 				inheritedItems = append(inheritedItems, "milestone")
 			}
-			
+
 			if len(inheritedItems) > 0 {
 				fmt.Printf("     → Inherits: %s\n", strings.Join(inheritedItems, ", "))
 			}
 		}
-		
+
 		fmt.Println("\n─────────────────────────────────")
 		fmt.Printf("Total: %d sub-issues would be created\n", wouldCreateCount)
 		fmt.Println("\nTo actually create these sub-issues, run without --dry-run")
-		
+
 	} else {
 		// Normal mode: actually create sub-issues
 		for i, task := range tasks {
@@ -290,7 +290,7 @@ func runSplit(cmd *cobra.Command, args []string) error {
 				skippedCount++
 				continue
 			}
-			
+
 			subIssue, err := createSubIssue(client, parentIssue, task, i+1, splitRepo)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to create sub-issue for task '%s': %v\n", task, err)
@@ -299,7 +299,7 @@ func runSplit(cmd *cobra.Command, args []string) error {
 			createdIssues = append(createdIssues, subIssue)
 			fmt.Printf("✓ Created sub-issue #%d: %s\n", subIssue.Number, subIssue.Title)
 		}
-		
+
 		if skippedCount > 0 {
 			fmt.Printf("\nSkipped %d tasks that already have sub-issues\n", skippedCount)
 		}
@@ -309,12 +309,12 @@ func runSplit(cmd *cobra.Command, args []string) error {
 	// Note: GitHub's native sub-issue feature will show these automatically
 	// Uncomment if you want to also add links in the issue body
 	/*
-	if len(createdIssues) > 0 {
-		err = updateParentIssueWithSubIssues(client, parentIssue, createdIssues, splitRepo)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to update parent issue with sub-issue links: %v\n", err)
+		if len(createdIssues) > 0 {
+			err = updateParentIssueWithSubIssues(client, parentIssue, createdIssues, splitRepo)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to update parent issue with sub-issue links: %v\n", err)
+			}
 		}
-	}
 	*/
 
 	// Output summary (skip for dry-run in non-JSON format)
@@ -322,7 +322,7 @@ func runSplit(cmd *cobra.Command, args []string) error {
 		// Already printed detailed preview above
 		return nil
 	}
-	
+
 	var formatType output.FormatType
 	switch outputFormat {
 	case "json":
@@ -336,24 +336,24 @@ func runSplit(cmd *cobra.Command, args []string) error {
 	default:
 		formatType = output.FormatJSON
 	}
-	
+
 	formatter := output.NewFormatter(formatType)
-	
+
 	if splitDryRun {
 		// For dry-run JSON output
 		summary := map[string]interface{}{
-			"dry_run": true,
-			"parent_issue": issueNum,
+			"dry_run":            true,
+			"parent_issue":       issueNum,
 			"would_create_count": wouldCreateCount,
-			"tasks": tasks,
+			"tasks":              tasks,
 		}
 		return formatter.Format(summary)
 	} else {
 		// Normal output
 		summary := map[string]interface{}{
-			"parent_issue": issueNum,
+			"parent_issue":  issueNum,
 			"created_count": len(createdIssues),
-			"sub_issues": createdIssues,
+			"sub_issues":    createdIssues,
 		}
 		return formatter.Format(summary)
 	}
@@ -365,7 +365,7 @@ func extractTasksFromIssueBody(issueNum int, repo string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	tasks := extractChecklistItems(parentIssue.Body)
 	return tasks, nil
 }
@@ -376,22 +376,22 @@ func extractTasksFromFile(filepath string) ([]string, error) {
 		return nil, err
 	}
 	defer file.Close()
-	
+
 	return extractTasksFromReader(file)
 }
 
 func extractTasksFromReader(reader io.Reader) ([]string, error) {
 	scanner := bufio.NewScanner(reader)
-	
+
 	// Try to detect if it's JSON
 	var allContent strings.Builder
 	for scanner.Scan() {
 		line := scanner.Text()
 		allContent.WriteString(line + "\n")
 	}
-	
+
 	content := strings.TrimSpace(allContent.String())
-	
+
 	// Check if it's JSON array
 	if strings.HasPrefix(content, "[") {
 		var jsonTasks []string
@@ -400,17 +400,17 @@ func extractTasksFromReader(reader io.Reader) ([]string, error) {
 			return jsonTasks, nil
 		}
 	}
-	
+
 	// Otherwise, extract checklist items
 	return extractChecklistItems(content), nil
 }
 
 func extractChecklistItems(text string) []string {
 	tasks := []string{}
-	
+
 	// Match GitHub-style checkboxes: - [ ] or - [x]
 	checkboxPattern := regexp.MustCompile(`^[\s]*[-*]\s*\[[ xX]\]\s*(.+)`)
-	
+
 	lines := strings.Split(text, "\n")
 	for _, line := range lines {
 		matches := checkboxPattern.FindStringSubmatch(line)
@@ -421,67 +421,67 @@ func extractChecklistItems(text string) []string {
 			}
 		}
 	}
-	
+
 	return tasks
 }
 
 func createSubIssue(client *issue.Client, parentIssue issue.Issue, task string, index int, repo string) (issue.Issue, error) {
 	// Use gh sub-issue create to create a linked sub-issue
-	args := []string{"sub-issue", "create", 
+	args := []string{"sub-issue", "create",
 		"--parent", strconv.Itoa(parentIssue.Number),
 		"--title", task,
 		"--body", fmt.Sprintf("## Task\n%s", task),
 	}
-	
+
 	// Add labels from parent (except certain meta labels)
 	for _, label := range parentIssue.Labels {
 		if label.Name != "epic" && label.Name != "parent" && label.Name != "sub-task" {
 			args = append(args, "--label", label.Name)
 		}
 	}
-	
+
 	// Add assignees from parent
 	for _, assignee := range parentIssue.Assignees {
 		args = append(args, "--assignee", assignee)
 	}
-	
+
 	// Add milestone if present
 	if parentIssue.Milestone != "" {
 		args = append(args, "--milestone", parentIssue.Milestone)
 	}
-	
+
 	// Add repo if specified
 	if repo != "" {
 		args = append(args, "--repo", repo)
 	}
-	
+
 	cmd := exec.Command("gh", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		return issue.Issue{}, fmt.Errorf("failed to create sub-issue: %w\nstderr: %s", err, stderr.String())
 	}
-	
+
 	// Parse the output to get issue number and URL
 	output := strings.TrimSpace(stdout.String())
 	if output == "" {
 		return issue.Issue{}, fmt.Errorf("no output from gh sub-issue create")
 	}
-	
+
 	// Extract issue number from URL (format: https://github.com/owner/repo/issues/123)
 	parts := strings.Split(output, "/")
 	if len(parts) < 2 {
 		return issue.Issue{}, fmt.Errorf("unexpected output format: %s", output)
 	}
-	
+
 	numberStr := parts[len(parts)-1]
 	number, err := strconv.Atoi(numberStr)
 	if err != nil {
 		return issue.Issue{}, fmt.Errorf("failed to parse issue number from URL: %s", output)
 	}
-	
+
 	return issue.Issue{
 		Number: number,
 		Title:  task,
@@ -495,10 +495,10 @@ func updateParentIssueWithSubIssues(client *issue.Client, parentIssue issue.Issu
 	for _, subIssue := range subIssues {
 		subIssuesSection += fmt.Sprintf("- [ ] #%d %s\n", subIssue.Number, subIssue.Title)
 	}
-	
+
 	// Update parent issue body
 	updatedBody := parentIssue.Body
-	
+
 	// Check if sub-issues section already exists
 	if strings.Contains(updatedBody, "## Sub-Issues") {
 		// Replace existing section
@@ -508,13 +508,13 @@ func updateParentIssueWithSubIssues(client *issue.Client, parentIssue issue.Issu
 		// Append new section
 		updatedBody += subIssuesSection
 	}
-	
+
 	// Keep existing labels
 	labels := []string{}
 	for _, label := range parentIssue.Labels {
 		labels = append(labels, label.Name)
 	}
-	
+
 	return client.UpdateIssueWithRepo(parentIssue.Number, issue.IssueRequest{
 		Title:  parentIssue.Title,
 		Body:   updatedBody,

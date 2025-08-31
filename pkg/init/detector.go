@@ -18,7 +18,7 @@ func NewProjectDetector() (*ProjectDetector, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create project client: %w", err)
 	}
-	
+
 	return &ProjectDetector{
 		client: client,
 	}, nil
@@ -31,7 +31,7 @@ func (d *ProjectDetector) DetectCurrentRepo() (org, repo string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("failed to detect current repository: %w", err)
 	}
-	
+
 	return r.Owner, r.Name, nil
 }
 
@@ -41,7 +41,7 @@ func (d *ProjectDetector) ListRepoProjects(org, repo string) ([]project.Project,
 	if err != nil {
 		return nil, fmt.Errorf("failed to list repository projects: %w", err)
 	}
-	
+
 	return projects, nil
 }
 
@@ -51,6 +51,6 @@ func (d *ProjectDetector) ListOrgProjects(org string) ([]project.Project, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list organization projects: %w", err)
 	}
-	
+
 	return projects, nil
 }

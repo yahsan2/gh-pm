@@ -13,12 +13,12 @@ const ConfigFileName = ".gh-pm.yml"
 
 // Config represents the project configuration
 type Config struct {
-	Project       ProjectConfig             `yaml:"project"`
-	Repositories  []string                  `yaml:"repositories"`
-	Defaults      DefaultsConfig            `yaml:"defaults"`
-	Fields        map[string]Field          `yaml:"fields"`
-	Triage        map[string]TriageConfig   `yaml:"triage,omitempty"`
-	Metadata      *ConfigMetadata           `yaml:"metadata,omitempty"`
+	Project      ProjectConfig           `yaml:"project"`
+	Repositories []string                `yaml:"repositories"`
+	Defaults     DefaultsConfig          `yaml:"defaults"`
+	Fields       map[string]Field        `yaml:"fields"`
+	Triage       map[string]TriageConfig `yaml:"triage,omitempty"`
+	Metadata     *ConfigMetadata         `yaml:"metadata,omitempty"`
 }
 
 // ProjectConfig represents project settings
@@ -53,8 +53,8 @@ type TriageConfig struct {
 
 // TriageApply represents what to apply during triage
 type TriageApply struct {
-	Labels []string             `yaml:"labels,omitempty"`
-	Fields map[string]string    `yaml:"fields,omitempty"`
+	Labels []string          `yaml:"labels,omitempty"`
+	Fields map[string]string `yaml:"fields,omitempty"`
 }
 
 // TriageInteractive represents interactive options for triage
@@ -62,7 +62,6 @@ type TriageInteractive struct {
 	Status   bool `yaml:"status,omitempty"`
 	Estimate bool `yaml:"estimate,omitempty"`
 }
-
 
 // ConfigMetadata represents cached project metadata
 type ConfigMetadata struct {
@@ -254,18 +253,18 @@ func (c *Config) Validate() error {
 	if c.Project.Name == "" && c.Project.Number == 0 {
 		return fmt.Errorf("project name or number is required")
 	}
-	
+
 	if len(c.Repositories) == 0 {
 		return fmt.Errorf("at least one repository must be configured")
 	}
-	
+
 	// Validate repository format
 	for _, repo := range c.Repositories {
 		if !isValidRepository(repo) {
 			return fmt.Errorf("invalid repository format '%s': must be 'owner/repo'", repo)
 		}
 	}
-	
+
 	// Validate field mappings
 	if c.Fields != nil {
 		for name, field := range c.Fields {
@@ -277,7 +276,7 @@ func (c *Config) Validate() error {
 			}
 		}
 	}
-	
+
 	// Validate defaults against field mappings
 	if c.Defaults.Priority != "" {
 		if priority, ok := c.Fields["priority"]; ok {
@@ -286,7 +285,7 @@ func (c *Config) Validate() error {
 			}
 		}
 	}
-	
+
 	if c.Defaults.Status != "" {
 		if status, ok := c.Fields["status"]; ok {
 			if _, exists := status.Values[c.Defaults.Status]; !exists {
@@ -294,7 +293,7 @@ func (c *Config) Validate() error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -319,7 +318,7 @@ func (c *Config) GetFieldMetadata(fieldName string) *FieldMetadata {
 	if c.Metadata == nil || c.Metadata.Fields == nil {
 		return nil
 	}
-	
+
 	// Find the field in metadata
 	for _, field := range c.Metadata.Fields {
 		if field.Name == fieldName {
@@ -328,7 +327,7 @@ func (c *Config) GetFieldMetadata(fieldName string) *FieldMetadata {
 				ID:      field.ID,
 				Options: make(map[string]string),
 			}
-			
+
 			// Convert options array to map
 			for _, opt := range field.Options {
 				// Normalize option name to lowercase with underscores
@@ -336,11 +335,11 @@ func (c *Config) GetFieldMetadata(fieldName string) *FieldMetadata {
 				key = strings.ReplaceAll(key, " ", "_")
 				fieldMeta.Options[key] = opt.ID
 			}
-			
+
 			return fieldMeta
 		}
 	}
-	
+
 	return nil
 }
 
@@ -357,7 +356,7 @@ func (c *Config) GetFieldByName(name string) *FieldInfo {
 	if c.Metadata == nil || c.Metadata.Fields == nil {
 		return nil
 	}
-	
+
 	for _, field := range c.Metadata.Fields {
 		if field.Name == name {
 			return &field
@@ -371,7 +370,7 @@ func (c *Config) GetFieldByID(id string) *FieldInfo {
 	if c.Metadata == nil || c.Metadata.Fields == nil {
 		return nil
 	}
-	
+
 	for _, field := range c.Metadata.Fields {
 		if field.ID == id {
 			return &field
@@ -395,3 +394,4 @@ func isValidRepository(repo string) bool {
 func FindConfigPath() string {
 	return findConfigFile()
 }
+

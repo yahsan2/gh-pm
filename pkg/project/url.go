@@ -25,18 +25,18 @@ func (b *URLBuilder) GetProjectURL() string {
 	if projectNumber == 0 {
 		return ""
 	}
-	
+
 	// For organization projects
 	if b.config.Project.Org != "" {
 		return fmt.Sprintf("https://github.com/orgs/%s/projects/%d", b.config.Project.Org, projectNumber)
 	}
-	
+
 	// For user projects
 	owner := b.config.Project.Owner
 	if owner == "" {
 		return ""
 	}
-	
+
 	return fmt.Sprintf("https://github.com/users/%s/projects/%d", owner, projectNumber)
 }
 
@@ -46,21 +46,23 @@ func (b *URLBuilder) GetProjectItemURL(itemDatabaseID int) string {
 	if baseURL == "" {
 		return ""
 	}
-	
+
 	return fmt.Sprintf("%s?pane=issue&itemId=%d", baseURL, itemDatabaseID)
 }
 
 // GetProjectItemURLFromIssueID returns the project URL for an issue given its node ID
-func (b *URLBuilder) GetProjectItemURLFromIssueID(issueNodeID string, issueClient interface{ GetProjectItemID(string, string) (string, int, error) }) string {
+func (b *URLBuilder) GetProjectItemURLFromIssueID(issueNodeID string, issueClient interface {
+	GetProjectItemID(string, string) (string, int, error)
+}) string {
 	projectID := b.config.GetProjectID()
 	if projectID == "" {
 		return ""
 	}
-	
+
 	_, itemDatabaseID, err := issueClient.GetProjectItemID(issueNodeID, projectID)
 	if err != nil || itemDatabaseID == 0 {
 		return ""
 	}
-	
+
 	return b.GetProjectItemURL(itemDatabaseID)
 }

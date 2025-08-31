@@ -17,7 +17,7 @@ import (
 func TestInitCommand(t *testing.T) {
 	t.Run("contains function", func(t *testing.T) {
 		slice := []string{"apple", "banana", "orange"}
-		
+
 		assert.True(t, contains(slice, "banana"))
 		assert.False(t, contains(slice, "grape"))
 		assert.False(t, contains([]string{}, "anything"))
@@ -28,30 +28,30 @@ func TestInitCommand(t *testing.T) {
 		tmpDir := t.TempDir()
 		originalWd, _ := os.Getwd()
 		defer os.Chdir(originalWd)
-		
+
 		// Change to temp directory
 		err := os.Chdir(tmpDir)
 		require.NoError(t, err)
-		
+
 		// Create default config
 		cfg := config.DefaultConfig()
 		cfg.Project.Name = "Test Project"
 		cfg.Project.Org = "test-org"
 		cfg.Repositories = []string{"test-org/test-repo"}
-		
+
 		// Save config
 		configPath := filepath.Join(tmpDir, config.ConfigFileName)
 		err = cfg.Save(configPath)
 		require.NoError(t, err)
-		
+
 		// Verify file exists
 		_, err = os.Stat(configPath)
 		assert.NoError(t, err)
-		
+
 		// Load config and verify
 		loadedCfg, err := config.Load()
 		require.NoError(t, err)
-		
+
 		assert.Equal(t, "Test Project", loadedCfg.Project.Name)
 		assert.Equal(t, "test-org", loadedCfg.Project.Org)
 		assert.Equal(t, []string{"test-org/test-repo"}, loadedCfg.Repositories)
@@ -257,7 +257,7 @@ repositories:
 
 	// Run init command - should fail because config already exists
 	err = runInit(initCmd, []string{})
-	// Init command doesn't return error for existing config, 
+	// Init command doesn't return error for existing config,
 	// it prompts interactively instead
 	// Since we're not in interactive mode, it should still succeed
 	assert.NoError(t, err)
@@ -312,7 +312,7 @@ func TestParseProjectSelection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Parse input like selectProject would
 			choice, err := strconv.Atoi(tt.input)
-			
+
 			if err != nil || choice < 0 || choice > tt.max {
 				if tt.shouldError {
 					assert.True(t, err != nil || choice < 0 || choice > tt.max)
@@ -399,7 +399,7 @@ func TestValidateRepositoryFormat(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			parts := strings.Split(tt.repo, "/")
 			isValid := len(parts) == 2 && parts[0] != "" && parts[1] != ""
-			
+
 			if tt.shouldError {
 				assert.False(t, isValid)
 			} else {
@@ -461,7 +461,7 @@ func TestSanitizeFieldKey(t *testing.T) {
 			for strings.Contains(result, "__") {
 				result = strings.ReplaceAll(result, "__", "_")
 			}
-			
+
 			assert.Equal(t, tt.expected, result)
 		})
 	}

@@ -22,9 +22,9 @@ type Project struct {
 
 // Field represents a project field
 type Field struct {
-	ID       string      `json:"id"`
-	Name     string      `json:"name"`
-	DataType string      `json:"dataType"`
+	ID       string        `json:"id"`
+	Name     string        `json:"name"`
+	DataType string        `json:"dataType"`
 	Options  []FieldOption `json:"options,omitempty"`
 }
 
@@ -46,12 +46,12 @@ func NewClient() (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create REST client: %w", err)
 	}
-	
+
 	gqlClient, err := api.DefaultGraphQLClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GraphQL client: %w", err)
 	}
-	
+
 	return &Client{
 		rest: restClient,
 		gql:  gqlClient,
