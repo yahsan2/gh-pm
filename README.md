@@ -679,41 +679,6 @@ number,title,priority,status,assignee
 124,"Add user dashboard",medium,todo,janedoe
 ```
 
-## Integration
-
-### GitHub Actions
-
-```yaml
-name: Project Management
-on:
-  issues:
-    types: [opened, edited]
-
-jobs:
-  update-project:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install gh-pm extension
-        run: gh extension install yahsan2/gh-pm
-      - name: Update project fields
-        run: |
-          gh pm move ${{ github.event.issue.number }} \
-            --status "backlog" \
-            --priority p2
-```
-
-### Git Hooks
-
-```bash
-# .git/hooks/post-commit
-#!/bin/bash
-# Auto-update issue status on commit
-if [[ $(git log -1 --pretty=%B) =~ "#([0-9]+)" ]]; then
-  gh pm update "${BASH_REMATCH[1]}" --status "In Review"
-fi
-```
-
 ## Troubleshooting
 
 ### Authentication Issues
@@ -726,27 +691,6 @@ gh auth login
 
 # Use specific token
 export GH_TOKEN=your_token_here
-```
-
-### Project Access
-```bash
-# List accessible projects
-gh pm projects list
-
-# Check permissions
-gh pm debug permissions
-```
-
-### Performance
-```bash
-# Enable caching
-gh pm config set cache true
-
-# Clear cache
-gh pm cache clear
-
-# Verbose output for debugging
-gh pm list --verbose
 ```
 
 ## Contributing
