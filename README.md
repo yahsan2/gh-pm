@@ -133,72 +133,72 @@ Found Priority field with the following options:
 
 #### `gh pm intake`
 
-プロジェクトに含まれていない Issue を検索し、選択的にプロジェクトに追加するコマンドです。`gh issue list` と互換性のあるフィルタリングオプションを提供し、既存のプロジェクトIssueを自動的に除外します。
+Find and add issues not in the project with a `gh issue list` compatible interface. Automatically excludes issues already in the project.
 
-**主な機能:**
-- 🔍 **柔軟なフィルタリング** - ラベル、アサイン、著者、状態などで Issue を絞り込み
-- 🚫 **重複回避** - プロジェクトに既に存在する Issue を自動除外
-- 📊 **一括追加** - 複数の Issue を一度にプロジェクトに追加
-- 🏷️ **フィールド設定** - 追加時に Status や Priority を自動設定
-- 👀 **プレビューモード** - `--dry-run` で実際の変更なしに確認
+**Key Features:**
+- 🔍 **Flexible filtering** - Filter issues by labels, assignee, author, state, and more
+- 🚫 **Duplicate prevention** - Automatically excludes issues already in the project
+- 📊 **Bulk addition** - Add multiple issues to the project at once
+- 🏷️ **Field configuration** - Set Status and Priority fields when adding issues
+- 👀 **Preview mode** - Use `--dry-run` to preview changes without applying them
 
-**使用例:**
+**Usage Examples:**
 ```bash
-# プロジェクトに含まれていない全ての open issue を表示
+# List all open issues not in project
 gh pm intake
 
-# ラベルでフィルタリング（複数指定可能）
+# Filter by labels (multiple allowed)
 gh pm intake --label bug --label enhancement
 
-# アサイン済みの自分の issue を追加
+# Add your assigned issues
 gh pm intake --assignee @me
 
-# 検索クエリで絞り込み
+# Search with query
 gh pm intake --search "authentication error"
 
-# 追加時にプロジェクトフィールドを設定
+# Set project fields when adding
 gh pm intake --apply "status:backlog,priority:p2"
 
-# ドライランモード（実際には追加せずプレビュー）
+# Dry-run mode (preview without adding)
 gh pm intake --dry-run
 
-# 特定の著者の issue を検索
+# Filter by author
 gh pm intake --author octocat
 
-# マイルストーンでフィルタリング
+# Filter by milestone
 gh pm intake --milestone "v1.0"
 
-# 状態を指定（open, closed, all）
+# Specify state (open, closed, all)
 gh pm intake --state all
 
-# 取得数を制限
+# Limit number of issues
 gh pm intake --limit 50
 ```
 
-**フィルタオプション:**
-- `--label, -l` - ラベルでフィルタ（複数指定可能）
-- `--assignee, -a` - アサイン先でフィルタ（`@me` で自分）
-- `--author, -A` - 作成者でフィルタ
-- `--state, -s` - Issue の状態（open/closed/all、デフォルト: open）
-- `--milestone, -m` - マイルストーン番号またはタイトル
-- `--search, -S` - GitHub 検索クエリ
-- `--mention` - メンションされたユーザーでフィルタ
-- `--app` - GitHub App 作成者でフィルタ
-- `--limit, -L` - 取得する Issue の最大数（デフォルト: 100）
+**Filter Options:**
+- `--label, -l` - Filter by label (multiple allowed)
+- `--assignee, -a` - Filter by assignee (`@me` for self)
+- `--author, -A` - Filter by author
+- `--state, -s` - Issue state (open/closed/all, default: open)
+- `--milestone, -m` - Milestone number or title
+- `--search, -S` - GitHub search query
+- `--mention` - Filter by mentioned user
+- `--app` - Filter by GitHub App author
+- `--limit, -L` - Maximum number of issues to fetch (default: 100)
 
-**追加オプション:**
-- `--dry-run` - 実際に追加せずに何が追加されるかを表示
-- `--apply` - 追加時に設定するフィールド値（例: `status:backlog`, `priority:p2`）
+**Additional Options:**
+- `--dry-run` - Show what would be added without making changes
+- `--apply` - Field values to set when adding (e.g., `status:backlog`, `priority:p2`)
 
-**処理フロー:**
-1. 指定されたフィルタで Issue を検索（`gh issue list` 互換）
-2. プロジェクトに既に存在する Issue を取得
-3. 重複を除外して追加対象の Issue リストを作成
-4. 対象 Issue を表示し、ユーザーに確認
-5. 確認後、Issue をプロジェクトに追加
-6. `--apply` で指定されたフィールド値を設定
+**Process Flow:**
+1. Search for issues using specified filters (`gh issue list` compatible)
+2. Fetch issues already in the project
+3. Exclude duplicates to create list of issues to add
+4. Display target issues and request confirmation
+5. After confirmation, add issues to project
+6. Set field values specified by `--apply`
 
-**例: バグラベルの Issue を優先度 P2 で追加**
+**Example: Add bug-labeled issues with priority P2**
 ```bash
 $ gh pm intake --label bug --apply "status:backlog,priority:p2"
 Fetching issues with filters...
@@ -220,18 +220,87 @@ Successfully added 3/3 issues to project
 ### Project Management
 
 #### List Issues
+
+`gh pm list` command displays issues in the project with a `gh issue list` compatible interface. It also supports filtering by project-specific fields (Status, Priority, etc.).
+
+**Basic Usage:**
 ```bash
-# List all issues in current project
+# List all open issues in project
 gh pm list
 
-# Filter by status
-gh pm list --status "In Progress"
+# Use alias 'ls'
+gh pm ls
 
-# Filter by priority
-gh pm list --priority high,critical
+# Filter by state
+gh pm list --state closed
+gh pm list --state all
 
-# JSON output
-gh pm list --json number,title,priority,status
+# Filter by project fields
+gh pm list --status "in_progress"
+gh pm list --priority "p0,p1"
+
+# Filter by labels
+gh pm list --label bug --label enhancement
+
+# Filter by assignee
+gh pm list --assignee @me
+gh pm list --assignee octocat
+
+# Filter by author
+gh pm list --author johndoe
+
+# Filter by milestone
+gh pm list --milestone "v1.0"
+
+# Search with query
+gh pm list --search "authentication error"
+
+# Limit results (default: 30)
+gh pm list --limit 100
+
+# Combined filters
+gh pm list --state open --label bug --priority p0 --assignee @me
+```
+
+**Output Formats:**
+```bash
+# Output as JSON
+gh pm list --json number,title,status,priority,assignees,labels
+
+# Output all fields as JSON
+gh pm list --json
+
+# Process JSON with jq (coming soon)
+gh pm list --json number,title --jq '.[] | select(.number > 100)'
+
+# Format with Go template (coming soon)
+gh pm list --json number,title --template '{{range .}}#{{.number}}: {{.title}}{{"\n"}}{{end}}'
+
+# Open project board in web browser
+gh pm list --web
+```
+
+**Filter Options:**
+- `--state, -s` - Issue state (open/closed/all, default: open)
+- `--label, -l` - Filter by label (multiple allowed)
+- `--assignee, -a` - Filter by assignee (`@me` for self)
+- `--author, -A` - Filter by author
+- `--milestone, -m` - Milestone number or title
+- `--search, -S` - Text search (title and body)
+- `--mention` - Filter by mentioned user
+- `--app` - Filter by GitHub App author
+- `--limit, -L` - Maximum number to fetch (default: 30)
+
+**Project-specific Filters:**
+- `--status` - Filter by project Status field
+- `--priority` - Filter by project Priority field (comma-separated for multiple)
+
+**Output Example:**
+```
+#    TITLE                                    STATUS        PRIORITY  ASSIGNEES  LABELS
+1    Implement authentication system          In Progress   P0        user1      bug, enhancement
+2    Add user dashboard                       Backlog       P1        user2      feature
+3    Fix database connection timeout          Done          P2        -          bug
 ```
 
 #### Create Issue
@@ -822,7 +891,7 @@ npm run build
 - [x] **Dry-run mode** for previewing changes before applying
 
 ### 🚧 In Development / Planned
-- [ ] Issue listing and filtering (`gh pm list`)
+- [x] Issue listing and filtering (`gh pm list`)
 - [ ] Bulk operations and CSV import/export
 - [ ] Progress tracking and reporting (`gh pm status`)
 - [ ] Sprint management features
