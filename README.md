@@ -62,7 +62,7 @@ gh pm view 123
 gh pm move 123 --status in_progress
 
 # Find and add issues not in project
-gh pm intake --label bug
+gh pm intake --label bug --apply "status:backlog,priority:p2"
 
 # Split issue into sub-issues
 gh pm split 123 --from=body
@@ -127,6 +127,94 @@ Found Priority field with the following options:
   3. P2
 
 ✓ Configuration saved to .gh-pm.yml
+```
+
+### Issue Intake
+
+#### `gh pm intake`
+
+プロジェクトに含まれていない Issue を検索し、選択的にプロジェクトに追加するコマンドです。`gh issue list` と互換性のあるフィルタリングオプションを提供し、既存のプロジェクトIssueを自動的に除外します。
+
+**主な機能:**
+- 🔍 **柔軟なフィルタリング** - ラベル、アサイン、著者、状態などで Issue を絞り込み
+- 🚫 **重複回避** - プロジェクトに既に存在する Issue を自動除外
+- 📊 **一括追加** - 複数の Issue を一度にプロジェクトに追加
+- 🏷️ **フィールド設定** - 追加時に Status や Priority を自動設定
+- 👀 **プレビューモード** - `--dry-run` で実際の変更なしに確認
+
+**使用例:**
+```bash
+# プロジェクトに含まれていない全ての open issue を表示
+gh pm intake
+
+# ラベルでフィルタリング（複数指定可能）
+gh pm intake --label bug --label enhancement
+
+# アサイン済みの自分の issue を追加
+gh pm intake --assignee @me
+
+# 検索クエリで絞り込み
+gh pm intake --search "authentication error"
+
+# 追加時にプロジェクトフィールドを設定
+gh pm intake --apply "status:backlog,priority:p2"
+
+# ドライランモード（実際には追加せずプレビュー）
+gh pm intake --dry-run
+
+# 特定の著者の issue を検索
+gh pm intake --author octocat
+
+# マイルストーンでフィルタリング
+gh pm intake --milestone "v1.0"
+
+# 状態を指定（open, closed, all）
+gh pm intake --state all
+
+# 取得数を制限
+gh pm intake --limit 50
+```
+
+**フィルタオプション:**
+- `--label, -l` - ラベルでフィルタ（複数指定可能）
+- `--assignee, -a` - アサイン先でフィルタ（`@me` で自分）
+- `--author, -A` - 作成者でフィルタ
+- `--state, -s` - Issue の状態（open/closed/all、デフォルト: open）
+- `--milestone, -m` - マイルストーン番号またはタイトル
+- `--search, -S` - GitHub 検索クエリ
+- `--mention` - メンションされたユーザーでフィルタ
+- `--app` - GitHub App 作成者でフィルタ
+- `--limit, -L` - 取得する Issue の最大数（デフォルト: 100）
+
+**追加オプション:**
+- `--dry-run` - 実際に追加せずに何が追加されるかを表示
+- `--apply` - 追加時に設定するフィールド値（例: `status:backlog`, `priority:p2`）
+
+**処理フロー:**
+1. 指定されたフィルタで Issue を検索（`gh issue list` 互換）
+2. プロジェクトに既に存在する Issue を取得
+3. 重複を除外して追加対象の Issue リストを作成
+4. 対象 Issue を表示し、ユーザーに確認
+5. 確認後、Issue をプロジェクトに追加
+6. `--apply` で指定されたフィールド値を設定
+
+**例: バグラベルの Issue を優先度 P2 で追加**
+```bash
+$ gh pm intake --label bug --apply "status:backlog,priority:p2"
+Fetching issues with filters...
+Found 5 issues from search
+
+Found 3 issues not in project:
+  #45: Authentication fails on mobile
+  #67: Database connection timeout
+  #89: UI rendering issue in dark mode
+
+Add 3 issues to project? (y/N): y
+Adding issue #45 to project... ✓
+Adding issue #67 to project... ✓
+Adding issue #89 to project... ✓
+
+Successfully added 3/3 issues to project
 ```
 
 ### Project Management
