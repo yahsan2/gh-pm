@@ -4,16 +4,14 @@ A GitHub CLI extension for project management with GitHub Projects (v2) and Issu
 
 ## Features
 
-- 📊 **Project Management** - Manage GitHub Projects v2 directly from CLI
-- 🔄 **Issue Workflow** - Create, update, view, and track issues with rich metadata
-- 📥 **Issue Intake** - Find and add issues not in project with gh issue list compatible interface
+- 📊 **Project Management** - List, create, update, and view issues in GitHub Projects v2
+- 📥 **Issue Intake** - Find and add issues not in project with `gh issue list` compatible interface
 - 🔍 **Issue Triage** - Bulk process issues with configurable rules and interactive mode
-- 🎯 **Priority Management** - Set and track priorities across issues
-- 🔗 **Project Board Integration** - Direct links to GitHub Projects board views
-- 📈 **Progress Tracking** - Monitor task completion and project status
 - ➗ **Issue Splitting** - Decompose issues into sub-issues using GitHub's native hierarchy
+- 🎯 **Field Management** - Update Status and Priority fields directly from CLI
+- 🔗 **Project Board Integration** - Direct links to GitHub Projects board views
 - 🚀 **Dry-run Mode** - Preview changes before applying them
-- 🎨 **Multiple output formats** - Table, JSON, CSV, and quiet modes
+- 🎨 **Multiple output formats** - Table, JSON, CSV, and web browser views
 
 ## Installation
 
@@ -87,13 +85,8 @@ gh pm triage estimate --list
 - [`gh pm move`](#move-issue-update-project-fields) - Update issue status/priority
 
 ### Issue Organization
-- [`gh pm split`](#split-command) - Split issue into sub-issues
-- [`gh pm triage`](#triage-command) - Bulk process issues with rules
-
-### Progress Tracking (Coming Soon)
-- `gh pm status` - Overall project status
-- `gh pm priority-matrix` - View priority distribution
-- `gh pm burndown` - Sprint burndown charts
+- [`gh pm split`](#split-issues-task-decomposition) - Split issue into sub-issues
+- [`gh pm triage`](#triage-issues) - Bulk process issues with rules
 
 ## Core Commands
 
@@ -701,11 +694,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Update project
+      - name: Install gh-pm extension
+        run: gh extension install yahsan2/gh-pm
+      - name: Update project fields
         run: |
-          gh pm update ${{ github.event.issue.number }} \
-            --status "Todo" \
-            --priority medium
+          gh pm move ${{ github.event.issue.number }} \
+            --status "backlog" \
+            --priority p2
 ```
 
 ### Git Hooks
