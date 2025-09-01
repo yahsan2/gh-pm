@@ -74,6 +74,27 @@ gh pm triage tracked
 gh pm triage estimate --list
 ```
 
+## Command Reference
+
+### Setup & Configuration
+- [`gh pm init`](#gh-pm-init) - Initialize configuration with project detection
+
+### Project Management
+- [`gh pm list`](#list-issues) - List issues in project with filtering
+- [`gh pm intake`](#issue-intake) - Find and add issues not in project
+- [`gh pm create`](#create-issue) - Create new issue with project metadata
+- [`gh pm view`](#view-issue) - View issue details with project info
+- [`gh pm move`](#move-issue-update-project-fields) - Update issue status/priority
+
+### Issue Organization
+- [`gh pm split`](#split-command) - Split issue into sub-issues
+- [`gh pm triage`](#triage-command) - Bulk process issues with rules
+
+### Progress Tracking (Coming Soon)
+- `gh pm status` - Overall project status
+- `gh pm priority-matrix` - View priority distribution
+- `gh pm burndown` - Sprint burndown charts
+
 ## Core Commands
 
 ### Initialization
@@ -127,94 +148,6 @@ Found Priority field with the following options:
   3. P2
 
 ✓ Configuration saved to .gh-pm.yml
-```
-
-### Issue Intake
-
-#### `gh pm intake`
-
-Find and add issues not in the project with a `gh issue list` compatible interface. Automatically excludes issues already in the project.
-
-**Key Features:**
-- 🔍 **Flexible filtering** - Filter issues by labels, assignee, author, state, and more
-- 🚫 **Duplicate prevention** - Automatically excludes issues already in the project
-- 📊 **Bulk addition** - Add multiple issues to the project at once
-- 🏷️ **Field configuration** - Set Status and Priority fields when adding issues
-- 👀 **Preview mode** - Use `--dry-run` to preview changes without applying them
-
-**Usage Examples:**
-```bash
-# List all open issues not in project
-gh pm intake
-
-# Filter by labels (multiple allowed)
-gh pm intake --label bug --label enhancement
-
-# Add your assigned issues
-gh pm intake --assignee @me
-
-# Search with query
-gh pm intake --search "authentication error"
-
-# Set project fields when adding
-gh pm intake --apply "status:backlog,priority:p2"
-
-# Dry-run mode (preview without adding)
-gh pm intake --dry-run
-
-# Filter by author
-gh pm intake --author octocat
-
-# Filter by milestone
-gh pm intake --milestone "v1.0"
-
-# Specify state (open, closed, all)
-gh pm intake --state all
-
-# Limit number of issues
-gh pm intake --limit 50
-```
-
-**Filter Options:**
-- `--label, -l` - Filter by label (multiple allowed)
-- `--assignee, -a` - Filter by assignee (`@me` for self)
-- `--author, -A` - Filter by author
-- `--state, -s` - Issue state (open/closed/all, default: open)
-- `--milestone, -m` - Milestone number or title
-- `--search, -S` - GitHub search query
-- `--mention` - Filter by mentioned user
-- `--app` - Filter by GitHub App author
-- `--limit, -L` - Maximum number of issues to fetch (default: 100)
-
-**Additional Options:**
-- `--dry-run` - Show what would be added without making changes
-- `--apply` - Field values to set when adding (e.g., `status:backlog`, `priority:p2`)
-
-**Process Flow:**
-1. Search for issues using specified filters (`gh issue list` compatible)
-2. Fetch issues already in the project
-3. Exclude duplicates to create list of issues to add
-4. Display target issues and request confirmation
-5. After confirmation, add issues to project
-6. Set field values specified by `--apply`
-
-**Example: Add bug-labeled issues with priority P2**
-```bash
-$ gh pm intake --label bug --apply "status:backlog,priority:p2"
-Fetching issues with filters...
-Found 5 issues from search
-
-Found 3 issues not in project:
-  #45: Authentication fails on mobile
-  #67: Database connection timeout
-  #89: UI rendering issue in dark mode
-
-Add 3 issues to project? (y/N): y
-Adding issue #45 to project... ✓
-Adding issue #67 to project... ✓
-Adding issue #89 to project... ✓
-
-Successfully added 3/3 issues to project
 ```
 
 ### Project Management
@@ -303,7 +236,94 @@ gh pm list --web
 3    Fix database connection timeout          Done          P2        -          bug
 ```
 
+#### Issue Intake
+
+`gh pm intake` finds and adds issues not in the project with a `gh issue list` compatible interface. Automatically excludes issues already in the project.
+
+**Key Features:**
+- 🔍 **Flexible filtering** - Filter issues by labels, assignee, author, state, and more
+- 🚫 **Duplicate prevention** - Automatically excludes issues already in the project
+- 📊 **Bulk addition** - Add multiple issues to the project at once
+- 🏷️ **Field configuration** - Set Status and Priority fields when adding issues
+- 👀 **Preview mode** - Use `--dry-run` to preview changes without applying them
+
+**Usage Examples:**
+```bash
+# List all open issues not in project
+gh pm intake
+
+# Filter by labels (multiple allowed)
+gh pm intake --label bug --label enhancement
+
+# Add your assigned issues
+gh pm intake --assignee @me
+
+# Search with query
+gh pm intake --search "authentication error"
+
+# Set project fields when adding
+gh pm intake --apply "status:backlog,priority:p2"
+
+# Dry-run mode (preview without adding)
+gh pm intake --dry-run
+
+# Filter by author
+gh pm intake --author octocat
+
+# Filter by milestone
+gh pm intake --milestone "v1.0"
+
+# Specify state (open, closed, all)
+gh pm intake --state all
+
+# Limit number of issues
+gh pm intake --limit 50
+```
+
+**Filter Options:**
+- `--label, -l` - Filter by label (multiple allowed)
+- `--assignee, -a` - Filter by assignee (`@me` for self)
+- `--author, -A` - Filter by author
+- `--state, -s` - Issue state (open/closed/all, default: open)
+- `--milestone, -m` - Milestone number or title
+- `--search, -S` - GitHub search query
+- `--mention` - Filter by mentioned user
+- `--app` - Filter by GitHub App author
+- `--limit, -L` - Maximum number of issues to fetch (default: 100)
+
+**Additional Options:**
+- `--dry-run` - Show what would be added without making changes
+- `--apply` - Field values to set when adding (e.g., `status:backlog`, `priority:p2`)
+
+**Process Flow:**
+1. Search for issues using specified filters (`gh issue list` compatible)
+2. Fetch issues already in the project
+3. Exclude duplicates to create list of issues to add
+4. Display target issues and request confirmation
+5. After confirmation, add issues to project
+6. Set field values specified by `--apply`
+
+**Example: Add bug-labeled issues with priority P2**
+```bash
+$ gh pm intake --label bug --apply "status:backlog,priority:p2"
+Fetching issues with filters...
+Found 5 issues from search
+
+Found 3 issues not in project:
+  #45: Authentication fails on mobile
+  #67: Database connection timeout
+  #89: UI rendering issue in dark mode
+
+Add 3 issues to project? (y/N): y
+Adding issue #45 to project... ✓
+Adding issue #67 to project... ✓
+Adding issue #89 to project... ✓
+
+Successfully added 3/3 issues to project
+```
+
 #### Create Issue
+
 ```bash
 # Basic creation (will use defaults from .gh-pm.yml)
 gh pm create --title "Add user dashboard"
@@ -326,6 +346,29 @@ gh pm create --template bug
 
 # Batch creation from file
 gh pm create --from-file issues.yml
+```
+
+#### View Issue
+
+```bash
+# View issue with project metadata
+gh pm view 123
+
+# View with project URL (shows GitHub Projects board URL)
+gh pm view 123 --quiet  # Only shows URLs
+
+# Open in web browser (opens project board view)
+gh pm view 123 --web
+
+# View with comments
+gh pm view 123 --comments
+
+# View in different output formats
+gh pm view 123 --output json
+gh pm view 123 --output csv
+
+# View issue in specific repository
+gh pm view 456 --repo owner/repo
 ```
 
 #### Move Issue (Update Project Fields)
@@ -362,9 +405,9 @@ The exact field values depend on your project configuration (`.gh-pm.yml`):
 - Field values are case-sensitive and must match your project configuration
 - Use `gh pm init` to see available values for your project
 
-### Issue Splitting (Task Decomposition)
+### Issue Organization
 
-#### Split Command
+#### Split Issues (Task Decomposition)
 
 Decompose parent issues into sub-issues using GitHub's native issue hierarchy feature. This command automatically creates linked sub-issues from task lists, maintaining parent-child relationships for better project organization.
 
@@ -443,33 +486,7 @@ Skipped 1 task that already has sub-issues
 - Duplicate detection prevents creating the same sub-issue multiple times
 - Sub-issues can be managed independently while maintaining their relationship to the parent
 
-### View Issue Details
-
-#### View Command
-```bash
-# View issue with project metadata
-gh pm view 123
-
-# View with project URL (shows GitHub Projects board URL)
-gh pm view 123 --quiet  # Only shows URLs
-
-# Open in web browser (opens project board view)
-gh pm view 123 --web
-
-# View with comments
-gh pm view 123 --comments
-
-# View in different output formats
-gh pm view 123 --output json
-gh pm view 123 --output csv
-
-# View issue in specific repository
-gh pm view 456 --repo owner/repo
-```
-
-### Triage Operations
-
-#### Triage Command
+#### Triage Issues
 ```bash
 # Run a triage configuration
 gh pm triage tracked  # Applies labels and project fields to untracked issues
@@ -558,52 +575,6 @@ The following field types are planned for future releases:
 Not planned for interactive mode:
 - `REPOSITORY`, `LINKED_PULL_REQUESTS` - These are read-only fields
 
-### Priority Management
-
-#### Set Priority
-```bash
-# Set single issue priority using move command
-gh pm move 123 --priority p0  # Critical priority
-
-# Set priority with status update
-gh pm move 123 --status in_progress --priority p1
-
-# Note: Bulk priority updates coming in future releases
-# gh pm set-priority 123,124,125 --level critical  # Coming soon
-```
-
-#### Priority Matrix
-```bash
-# View priority matrix
-gh pm priority-matrix
-
-# Export as CSV
-gh pm priority-matrix --output csv > priorities.csv
-```
-
-### Progress Tracking
-
-#### Project Status
-```bash
-# Overall project status
-gh pm status
-
-# Detailed progress report
-gh pm status --detailed
-
-# Specific milestone
-gh pm status --milestone "v1.0"
-```
-
-#### Burndown
-```bash
-# Sprint burndown (when sprint support is added)
-gh pm burndown
-
-# Custom date range
-gh pm burndown --from 2024-01-01 --to 2024-01-31
-```
-
 ## Configuration
 
 ### Project Configuration (.gh-pm.yml)
@@ -664,73 +635,6 @@ metadata:
         critical: "79628723"
         high: "0a877460"
         medium: "da944a9c"
-```
-
-### Global Configuration
-
-```bash
-# Set default project
-gh pm config set default-project "My Project"
-
-# Set default output format
-gh pm config set output-format json
-
-# View all settings
-gh pm config list
-```
-
-## Advanced Usage
-
-### Cross-Repository Operations
-
-```bash
-# Create issue in specific repo
-gh pm create --repo owner/other-repo --title "Cross-repo task"
-
-# List issues from multiple repos
-gh pm list --repo owner/repo1,owner/repo2
-
-# Move issue between repos
-gh pm move 123 --to owner/other-repo
-```
-
-### Bulk Operations
-
-```bash
-# Bulk update from CSV
-gh pm bulk-update --file updates.csv
-
-# Export issues to CSV
-gh pm export --format csv --output issues.csv
-
-# Import issues from JSON
-gh pm import --file issues.json
-```
-
-### Templates
-
-```bash
-# Create issue from template
-gh pm create --template bug-report
-
-# List available templates
-gh pm templates list
-
-# Create custom template
-gh pm templates create --name "feature-request"
-```
-
-### Automation
-
-```bash
-# Watch for status changes
-gh pm watch --interval 30s
-
-# Run webhook on changes
-gh pm watch --webhook https://example.com/hook
-
-# Generate daily report
-gh pm report daily --email team@example.com
 ```
 
 ## Project URLs
