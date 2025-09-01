@@ -297,9 +297,7 @@ func (c *ViewCommand) openInBrowser(issueNumber int, repo string) error {
 	}
 
 	// Print the URL we're opening
-	if _, err := fmt.Fprintf(os.Stderr, "Opening %s in your browser.\n", urlToOpen); err != nil {
-		// Ignore error, just for user feedback
-	}
+	fmt.Fprintf(os.Stderr, "Opening %s in your browser.\n", urlToOpen)
 
 	// Open URL in browser based on OS
 	var cmd *exec.Cmd

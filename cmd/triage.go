@@ -418,7 +418,8 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 			// Apply other interactive field choices
 			for fieldName, fieldValue := range update.FieldChoices {
 				// Capitalize field name for consistency
-				displayFieldName := strings.Title(fieldName)
+				// Using simple capitalization instead of deprecated strings.Title
+				displayFieldName := strings.ToUpper(fieldName[:1]) + fieldName[1:]
 				if err := c.updateProjectField(projectID, update.ItemID, displayFieldName, fieldValue, fields); err != nil {
 					fmt.Printf("Warning: failed to update %s for issue #%d: %v\n", fieldName, update.Issue.Number, err)
 				} else {
@@ -1266,7 +1267,9 @@ func (c *TriageCommand) displayIssuesList(issues []GitHubIssue, triageConfig con
 			fmt.Printf("  - Estimate (will prompt for each issue)\n")
 		}
 		for fieldName := range triageConfig.InteractiveFields {
-			fmt.Printf("  - %s (will prompt for each issue)\n", strings.Title(fieldName))
+			// Using simple capitalization instead of deprecated strings.Title
+			capitalizedName := strings.ToUpper(fieldName[:1]) + fieldName[1:]
+			fmt.Printf("  - %s (will prompt for each issue)\n", capitalizedName)
 		}
 	}
 
