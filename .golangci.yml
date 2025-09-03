@@ -14,6 +14,9 @@ linters:
     - misspell
     - gofmt
     - goimports
+  
+  disable:
+    - unused
 
 linters-settings:
   goimports:

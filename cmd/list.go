@@ -646,7 +646,9 @@ func outputJSON(issues []ProjectIssue, fields, jqExpr, template string) error {
 			// Marshal to map for field selection
 			data, _ := json.Marshal(issue)
 			var fullItem map[string]interface{}
-			json.Unmarshal(data, &fullItem)
+			if err := json.Unmarshal(data, &fullItem); err != nil {
+				continue
+			}
 
 			// Select requested fields
 			for _, field := range requestedFields {

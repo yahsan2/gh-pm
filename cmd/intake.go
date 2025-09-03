@@ -251,7 +251,7 @@ func (c *IntakeCommand) processIssues(issues []GitHubIssue, dryRun bool, applyFi
 	// Confirm before adding
 	fmt.Printf("\nAdd %d issues to project? (y/N): ", len(issuesToAdd))
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 	if strings.ToLower(response) != "y" {
 		fmt.Println("Cancelled")
 		return nil
