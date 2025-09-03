@@ -56,7 +56,7 @@ func init() {
 
 	// Deprecated but kept for compatibility
 	intakeCmd.Flags().String("query", "", "GitHub search query (deprecated, use --search)")
-	intakeCmd.Flags().MarkDeprecated("query", "use --search instead")
+	_ = intakeCmd.Flags().MarkDeprecated("query", "use --search instead")
 
 	// intake specific flags
 	intakeCmd.Flags().Bool("dry-run", false, "Show what would be added without making changes")
@@ -251,7 +251,7 @@ func (c *IntakeCommand) processIssues(issues []GitHubIssue, dryRun bool, applyFi
 	// Confirm before adding
 	fmt.Printf("\nAdd %d issues to project? (y/N): ", len(issuesToAdd))
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 	if strings.ToLower(response) != "y" {
 		fmt.Println("Cancelled")
 		return nil

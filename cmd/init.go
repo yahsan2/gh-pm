@@ -62,7 +62,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		fmt.Print("Do you want to update it? (y/N): ")
 
 		var response string
-		fmt.Scanln(&response)
+		_, _ = fmt.Scanln(&response)
 		if strings.ToLower(response) != "y" {
 			fmt.Println("Initialization cancelled.")
 			return nil
