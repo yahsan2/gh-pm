@@ -32,3 +32,8 @@ issues:
     - path: _test\.go
       linters:
         - errcheck
+    
+    # Exclude fmt.Print* from errcheck
+    - text: "Error return value of `fmt\\.(Print|Printf|Println|Fprint|Fprintf|Fprintln)` is not checked"
+      linters:
+        - errcheck
