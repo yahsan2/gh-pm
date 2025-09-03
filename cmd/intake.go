@@ -56,7 +56,7 @@ func init() {
 
 	// Deprecated but kept for compatibility
 	intakeCmd.Flags().String("query", "", "GitHub search query (deprecated, use --search)")
-	intakeCmd.Flags().MarkDeprecated("query", "use --search instead")
+	_ = intakeCmd.Flags().MarkDeprecated("query", "use --search instead")
 
 	// intake specific flags
 	intakeCmd.Flags().Bool("dry-run", false, "Show what would be added without making changes")
