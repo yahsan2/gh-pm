@@ -25,14 +25,14 @@ This command will:
 - Execute the GitHub search query defined in the triage configuration or provided via --query
 - Apply labels, status, and priority updates to matching issues
 - Update project fields for issues that are part of the configured project`,
-	Example: `  # Run the hogehoge triage configuration
-  gh pm triage hogehoge
+	Example: `  # Run the foobar triage configuration
+  gh pm triage foobar
   
   # List issues that would be affected without making changes
-  gh pm triage hogehoge --list
+  gh pm triage foobar --list
   
   # Same as --list (dry-run mode)
-  gh pm triage hogehoge --dry-run
+  gh pm triage foobar --dry-run
   
   # Ad-hoc triage with query and apply
   gh pm triage --query="status:backlog -has:estimate" --apply="status:in_progress"
