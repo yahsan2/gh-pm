@@ -2,175 +2,30 @@
 # golangci-lint configuration for gh-pm project
 
 run:
-  # Timeout for analysis
   timeout: 5m
-  
-  # Exit code when at least one issue was found
-  issues-exit-code: 1
-  
-  # Include test files
   tests: true
 
 linters:
   enable:
-    - gofmt
-    - goimports
     - govet
     - errcheck
     - staticcheck
-    - gosimple
     - ineffassign
-    - typecheck
     - misspell
-    
-  disable:
-    - unused
-    - gosec
-    - dupl
-    - gocyclo
-    - gocognit
-    - funlen
-    - lll
-    - gochecknoinits
-    - gochecknoglobals
-    - godox
-    - wsl
-    - nlreturn
-    - exhaustive
-    - exhaustruct
-    - contextcheck
-    - errorlint
-    - nilerr
-    - unparam
-    - gocritic
-    - revive
+    - gofmt
+    - goimports
 
 linters-settings:
-  gofmt:
-    simplify: true
-    
   goimports:
     local-prefixes: github.com/yahsan2/gh-pm
-    
-  govet:
-    enable-all: false
-    
-  errcheck:
-    check-type-assertions: true
-    check-blank: false
-    exclude-functions:
-      - io.Copy
-      - io.Closer.Close
-      - os.RemoveAll
-      
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-    disabled-checks:
-      - hugeParam
-      - rangeValCopy
-      - commentedOutCode
-      - whyNoLint
-      - appendAssign
-      - ifElseChain
-      - equalFold
-      
-  revive:
-    enable-all-rules: false
-    rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: exported
-        disabled: true
-      - name: increment-decrement
-      - name: var-naming
-        disabled: true
-      - name: package-comments
-        disabled: true
-      - name: range
-      - name: receiver-naming
-      - name: indent-error-flow
-        disabled: true
-      - name: superfluous-else
-      - name: modifies-parameter
-      - name: unreachable-code
-      
-  staticcheck:
-    checks: ["all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022"]
-    
-  gosimple:
-    checks: ["all"]
 
 issues:
-  # Skip generated files
   exclude-dirs:
     - dist
     - vendor
     - .worktree
-    
-  exclude-files:
-    - ".*\\.pb\\.go$"
-    - ".*\\.gen\\.go$"
-    
-  # Excluding configuration per-path, per-linter, per-text and per-source
+  
   exclude-rules:
-    # Exclude lll issues for long lines with URLs
-    - source: "https?://"
-      linters:
-        - lll
-        
-    # Exclude test files from some linters
     - path: _test\.go
       linters:
         - errcheck
-        - dupl
-        - gosec
-        - gocritic
-        
-    # Exclude generated files
-    - path: \.gen\.go
-      linters:
-        - golint
-        - stylecheck
-        
-    # Exclude vendor
-    - path: vendor/
-      linters:
-        - golint
-        - stylecheck
-        
-    # Exclude specific messages
-    - text: "Error return value of .* is not checked"
-      linters:
-        - errcheck
-        
-    # Exclude cmd.Run() not checked in tests
-    - path: _test\.go
-      text: "Error return value of `.*\\.Run` is not checked"
-      linters:
-        - errcheck
-        
-  # Maximum issues count per one linter
-  max-issues-per-linter: 0
-  
-  # Maximum count of issues with the same text
-  max-same-issues: 0
-  
-  # Show only new issues for PR builds
-  new: false
-
-severity:
-  # Default value is an empty string.
-  default-severity: error
-  
-  # The list of ids of default excludes to include or disable.
-  rules:
-    - linters:
-      - dupl
-      severity: info
