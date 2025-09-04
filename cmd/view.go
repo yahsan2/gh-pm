@@ -26,13 +26,13 @@ This command shows:
 - Project board URL for quick access`,
 	Example: `  # View an issue by number
   gh pm view 123
-  
+
   # View an issue in a specific repository
   gh pm view 456 --repo owner/repo
-  
+
   # View in JSON format
   gh pm view 789 --output json
-  
+
   # View with quiet output (URLs only)
   gh pm view 101 --quiet`,
 	Args: cobra.ExactArgs(1),

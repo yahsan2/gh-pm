@@ -29,20 +29,20 @@ var splitCmd = &cobra.Command{
 	Use:   "split [issue number] [tasks...]",
 	Short: "Split an issue into sub-issues",
 	Long: `Split a parent issue into sub-issues with automatic parent-child linking.
-	
+
 Examples:
   # Split from issue body checklist
   gh pm split 123 --from=body
-  
+
   # Split from a file
   gh pm split 123 --from=./tasks.md
-  
+
   # Split from stdin
   cat tasks.md | gh pm split 123
-  
+
   # Split from JSON array
   gh pm split 123 '["Task 1", "Task 2", "Task 3"]'
-  
+
   # Split from command arguments
   gh pm split 123 "Task 1" "Task 2" "Task 3"`,
 	Args: func(cmd *cobra.Command, args []string) error {

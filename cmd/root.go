@@ -13,7 +13,7 @@ var rootCmd = &cobra.Command{
 	Use:   "gh-pm",
 	Short: "GitHub CLI extension for project management",
 	Long: `A GitHub CLI extension for project management with GitHub Projects (v2) and Issues.
-	
+
 This extension allows you to:
 - Manage GitHub Projects v2 directly from CLI
 - Create, update, and track issues with rich metadata

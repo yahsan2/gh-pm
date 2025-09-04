@@ -13,15 +13,15 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         go-version: ['1.21', '1.22']
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: ${{ matrix.go-version }}
-    
+
     - name: Cache Go modules
       uses: actions/cache@v3
       with:
@@ -29,15 +29,15 @@ jobs:
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
-    
+
     - name: Download dependencies
       run: go mod download
-    
+
     - name: Build
       run: go build -v ./...
-    
+
     - name: Build binary
       run: go build -o gh-pm main.go
-    
+
     - name: Verify binary
       run: ./gh-pm version || true

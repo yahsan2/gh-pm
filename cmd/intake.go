@@ -17,26 +17,26 @@ var intakeCmd = &cobra.Command{
 	Use:   "intake",
 	Short: "List and add issues not in project",
 	Long: `List issues that are not in the project and optionally add them.
-	
+
 This command will:
 - List issues based on filters (similar to gh issue list)
 - Filter out issues already in the project
 - Optionally add remaining issues to the project`,
 	Example: `  # List all open issues not in project
   gh pm intake
-  
+
   # Filter by label
   gh pm intake --label bug --label enhancement
-  
+
   # Filter by assignee
   gh pm intake --assignee @me
-  
+
   # Search with query
   gh pm intake --search "authentication"
-  
+
   # Preview what would be added without making changes
   gh pm intake --dry-run
-  
+
   # Add issues and set project fields
   gh pm intake --apply "status:backlog,priority:p2"`,
 	RunE: runIntake,

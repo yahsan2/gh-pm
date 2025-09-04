@@ -28,19 +28,19 @@ This command will:
 - Apply default labels from configuration`,
 	Example: `  # Create an issue with a title
   gh pm create --title "Fix login bug"
-  
+
   # Create an issue with title and body
   gh pm create --title "Add new feature" --body "Description of the feature"
-  
+
   # Create with specific priority and status
   gh pm create --title "Critical issue" --priority high --status in_progress
-  
+
   # Create from a file (batch mode)
   gh pm create --from-file issues.yml
-  
+
   # Create from a template
   gh pm create --template bug
-  
+
   # Interactive mode
   gh pm create --interactive`,
 	RunE: runCreate,

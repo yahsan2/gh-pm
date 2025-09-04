@@ -25,25 +25,25 @@ This command provides a gh issue list compatible interface for viewing issues
 within your project, with additional project-specific field filtering.`,
 	Example: `  # List all open issues in project
   gh pm list
-  
+
   # Filter by status
   gh pm list --status "in_progress"
-  
+
   # Filter by priority
   gh pm list --priority "p0,p1"
-  
+
   # Filter by assignee
   gh pm list --assignee @me
-  
+
   # Filter by labels
   gh pm list --label bug --label enhancement
-  
+
   # Search with query
   gh pm list --search "authentication"
-  
+
   # JSON output with specific fields
   gh pm list --json number,title,status,priority
-  
+
   # Open in web browser
   gh pm list --web`,
 	RunE: runList,

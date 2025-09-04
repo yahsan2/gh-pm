@@ -18,17 +18,17 @@ var moveCmd = &cobra.Command{
 	Long: `Move an issue within a project by updating fields such as status and priority.
 
 This command allows you to quickly update project fields for an issue:
-- Change status (e.g., "todo", "in_progress", "done")  
+- Change status (e.g., "todo", "in_progress", "done")
 - Change priority (e.g., "low", "medium", "high", "critical")
 - Update multiple fields in a single operation
 
 The issue must already be added to the configured project.`,
 	Example: `  # Change issue status to ready
   gh pm move 15 --status ready
-  
+
   # Change priority to high
   gh pm move 123 --priority high
-  
+
   # Update both status and priority
   gh pm move 42 --status in_progress --priority critical`,
 	Args: cobra.ExactArgs(1),

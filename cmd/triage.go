@@ -20,23 +20,23 @@ var triageCmd = &cobra.Command{
 	Use:   "triage [triage-name]",
 	Short: "Execute a triage configuration to update issues based on query",
 	Long: `Execute a predefined triage configuration from .gh-pm.yml or run ad-hoc triage.
-	
+
 This command will:
 - Execute the GitHub search query defined in the triage configuration or provided via --query
 - Apply labels, status, and priority updates to matching issues
 - Update project fields for issues that are part of the configured project`,
 	Example: `  # Run the foobar triage configuration
   gh pm triage foobar
-  
+
   # List issues that would be affected without making changes
   gh pm triage foobar --list
-  
+
   # Same as --list (dry-run mode)
   gh pm triage foobar --dry-run
-  
+
   # Ad-hoc triage with query and apply
   gh pm triage --query="status:backlog -has:estimate" --apply="status:in_progress"
-  
+
   # Ad-hoc triage with interactive mode for specific fields
   gh pm triage --query="status:backlog" --interactive="status,estimate"
   gh pm triage --query="-has:priority" --interactive="priority"`,

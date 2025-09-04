@@ -19,17 +19,17 @@ var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize gh-pm configuration",
 	Long: `Initialize a new gh-pm configuration file (.gh-pm.yml) in the current directory.
-	
+
 This command will:
 - Create a .gh-pm.yml configuration file
 - Set up project and repository settings
 - Configure default values and field mappings`,
 	Example: `  # Interactive initialization
   gh pm init
-  
+
   # Specify project and repositories
   gh pm init --project "My Project" --repo owner/repo1,owner/repo2
-  
+
   # Specify organization project
   gh pm init --project "Team Project" --org my-organization`,
 	RunE: runInit,

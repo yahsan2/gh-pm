@@ -12,15 +12,15 @@ jobs:
     strategy:
       matrix:
         go-version: ['1.21', '1.22']
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: ${{ matrix.go-version }}
-    
+
     - name: Cache Go modules
       uses: actions/cache@v3
       with:
@@ -28,13 +28,13 @@ jobs:
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
-    
+
     - name: Download dependencies
       run: go mod download
-    
+
     - name: Run tests
       run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
-    
+
     - name: Upload coverage to Codecov
       if: matrix.go-version == '1.22'
       uses: codecov/codecov-action@v4
@@ -43,10 +43,10 @@ jobs:
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
-    
+
     - name: Generate coverage report
       run: go tool cover -func=coverage.out
-    
+
     - name: Check coverage threshold
       run: |
         COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
