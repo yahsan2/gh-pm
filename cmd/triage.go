@@ -540,17 +540,16 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 		repo = c.config.Repositories[0]
 	}
 
-	fmt.Printf("Searching issues with query: %s\n", query)
-	if repo != "" {
-		fmt.Printf("Repository: %s\n", repo)
+	// Add repo to the search query if specified
+	if repo != "" && !strings.Contains(query, "repo:") {
+		query = fmt.Sprintf("repo:%s %s", repo, query)
 	}
+
+	fmt.Printf("Searching issues with query: %s\n", query)
 
 	// Use gh issue list with --search option to properly filter issues
 	// GitHub now supports @today-1d syntax directly
 	args := []string{"issue", "list", "--search", query, "--json", "number,title,id,url"}
-	if repo != "" {
-		args = append(args, "--repo", repo)
-	}
 
 	cmd := exec.Command("gh", args...)
 	output, err := cmd.CombinedOutput()
@@ -788,17 +787,34 @@ func (c *TriageCommand) collectStatusChoice(issue GitHubIssue, reader *bufio.Rea
 
 	fmt.Printf("\nSelect status for issue #%d: %s\n", issue.Number, issue.Title)
 
-	// Get available status options from config mapping
+	// Get available status options
 	var availableOptions []string
 	var configMapping map[string]string
 
 	if statusFieldConfig, ok := c.config.Fields["status"]; ok {
 		configMapping = statusFieldConfig.Values
-		for key := range configMapping {
-			availableOptions = append(availableOptions, key)
+
+		// If we have config mapping, use the order from field.Options
+		// and only include options that are in the config mapping
+		if len(configMapping) > 0 {
+			// Use the order from statusField.Options
+			for _, option := range statusField.Options {
+				// Check if this option has a reverse mapping in config
+				for key, value := range configMapping {
+					if value == option.Name {
+						availableOptions = append(availableOptions, key)
+						break
+					}
+				}
+			}
+		} else {
+			// No mapping, use field options directly
+			for _, option := range statusField.Options {
+				availableOptions = append(availableOptions, option.Name)
+			}
 		}
 	} else {
-		// Fallback to direct field options
+		// No config, use field options directly
 		for _, option := range statusField.Options {
 			availableOptions = append(availableOptions, option.Name)
 		}
@@ -885,11 +901,28 @@ func (c *TriageCommand) collectFieldChoice(issue GitHubIssue, reader *bufio.Read
 		// Check if there's a config mapping for this field
 		if fieldConfig, ok := c.config.Fields[strings.ToLower(fieldName)]; ok {
 			configMapping = fieldConfig.Values
-			for key := range configMapping {
-				availableOptions = append(availableOptions, key)
+
+			// If we have config mapping, use the order from targetField.Options
+			// and only include options that are in the config mapping
+			if len(configMapping) > 0 {
+				// Use the order from targetField.Options
+				for _, option := range targetField.Options {
+					// Check if this option has a reverse mapping in config
+					for key, value := range configMapping {
+						if value == option.Name {
+							availableOptions = append(availableOptions, key)
+							break
+						}
+					}
+				}
+			} else {
+				// No mapping, use field options directly
+				for _, option := range targetField.Options {
+					availableOptions = append(availableOptions, option.Name)
+				}
 			}
 		} else {
-			// Use field options directly
+			// No config, use field options directly
 			for _, option := range targetField.Options {
 				availableOptions = append(availableOptions, option.Name)
 			}
