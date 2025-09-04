@@ -40,6 +40,14 @@ triage:
                 status: backlog
         interactive:
             status: true
+    stale:
+      query: "is:issue is:open -label:pm-tracked updated:<@today-1d"
+      instruction: "Starting triage for untracked issues. This will add the pm-tracked label and set default project fields."
+      apply:
+        labels:
+          - stale
+
+
 metadata:
     project:
         id: PVT_kwHOAAlRwM4BBvYB

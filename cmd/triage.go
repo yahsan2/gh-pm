@@ -534,16 +534,20 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 		return c.searchIssuesWithProjectFields(fieldFilters, fieldExcludes, labelExcludes)
 	}
 
-	// Fallback to original implementation for label-only filters
+	// Use GitHub search API with the full query
 	var repo string
 	if len(c.config.Repositories) > 0 {
 		repo = c.config.Repositories[0]
 	}
 
-	fmt.Printf("Fetching issues from repository: %s\n", repo)
+	fmt.Printf("Searching issues with query: %s\n", query)
+	if repo != "" {
+		fmt.Printf("Repository: %s\n", repo)
+	}
 
-	// Get all open issues with labels
-	args := []string{"issue", "list", "--state=open", "--json", "number,title,id,url,labels"}
+	// Use gh issue list with --search option to properly filter issues
+	// GitHub now supports @today-1d syntax directly
+	args := []string{"issue", "list", "--search", query, "--json", "number,title,id,url"}
 	if repo != "" {
 		args = append(args, "--repo", repo)
 	}
@@ -551,52 +555,34 @@ func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
 	cmd := exec.Command("gh", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch issues: %w, output: %s", err, string(output))
+		return nil, fmt.Errorf("failed to search issues: %w, output: %s", err, string(output))
 	}
 
 	// Parse JSON output
-	var allIssues []struct {
+	var issues []struct {
 		Number int    `json:"number"`
 		Title  string `json:"title"`
 		ID     string `json:"id"`
 		URL    string `json:"url"`
-		Labels []struct {
-			Name string `json:"name"`
-		} `json:"labels"`
 	}
 
-	if err := json.Unmarshal(output, &allIssues); err != nil {
+	if err := json.Unmarshal(output, &issues); err != nil {
 		return nil, fmt.Errorf("failed to parse issues: %w", err)
 	}
 
-	// Filter based on query (for label-only filtering)
-	var filteredIssues []GitHubIssue
-	for _, issue := range allIssues {
-		// Check label exclusions
-		skipItem := false
-		for _, excludeLabel := range labelExcludes {
-			for _, label := range issue.Labels {
-				if label.Name == excludeLabel {
-					skipItem = true
-					break
-				}
-			}
-			if skipItem {
-				break
-			}
-		}
-		if !skipItem {
-			filteredIssues = append(filteredIssues, GitHubIssue{
-				Number: issue.Number,
-				Title:  issue.Title,
-				ID:     issue.ID,
-				URL:    issue.URL,
-			})
-		}
+	// Convert to GitHubIssue format
+	var result []GitHubIssue
+	for _, issue := range issues {
+		result = append(result, GitHubIssue{
+			Number: issue.Number,
+			Title:  issue.Title,
+			ID:     issue.ID,
+			URL:    issue.URL,
+		})
 	}
 
-	fmt.Printf("Found %d open issues, %d match query criteria\n", len(allIssues), len(filteredIssues))
-	return filteredIssues, nil
+	fmt.Printf("Found %d issues matching query\n", len(result))
+	return result, nil
 }
 
 func (c *TriageCommand) applyLabels(issueNumber int, labels []string) error {

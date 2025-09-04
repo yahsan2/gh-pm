@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var Version = "dev"
+var Version = "v0.6.3"
 
 var rootCmd = &cobra.Command{
 	Use:   "gh-pm",
