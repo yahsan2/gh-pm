@@ -1,6 +1,6 @@
 module github.com/yahsan2/gh-pm
 
-go 1.23.0
+go 1.23
 
 require (
 	github.com/cli/go-gh/v2 v2.12.1
