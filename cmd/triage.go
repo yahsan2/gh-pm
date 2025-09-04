@@ -14,6 +14,7 @@ import (
 	"github.com/yahsan2/gh-pm/pkg/config"
 	"github.com/yahsan2/gh-pm/pkg/issue"
 	"github.com/yahsan2/gh-pm/pkg/project"
+	"github.com/yahsan2/gh-pm/pkg/utils"
 )
 
 var triageCmd = &cobra.Command{
@@ -434,6 +435,17 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 }
 
 func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
+	// Convert GitHub Projects date expressions in query
+	if query != "" {
+		convertedQuery, err := utils.ConvertSearchQuery(query)
+		if err != nil {
+			// If conversion fails, use original query and log warning
+			fmt.Fprintf(os.Stderr, "Warning: Failed to convert date expressions in query: %v\n", err)
+		} else {
+			query = convertedQuery
+		}
+	}
+
 	// Parse query to extract field filters
 	fieldFilters := make(map[string]string) // field name -> filter value
 	fieldExcludes := make(map[string]bool)  // field name -> true if should be empty/unset

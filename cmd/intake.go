@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/yahsan2/gh-pm/pkg/config"
 	"github.com/yahsan2/gh-pm/pkg/issue"
 	"github.com/yahsan2/gh-pm/pkg/project"
+	"github.com/yahsan2/gh-pm/pkg/utils"
 )
 
 var intakeCmd = &cobra.Command{
@@ -33,6 +35,10 @@ This command will:
 
   # Search with query
   gh pm intake --search "authentication"
+
+  # Search with GitHub Projects date expressions
+  gh pm intake --search "created:@today-1w"
+  gh pm intake --search "updated:>@today-30d"
 
   # Preview what would be added without making changes
   gh pm intake --dry-run
@@ -101,6 +107,17 @@ func runIntake(cmd *cobra.Command, args []string) error {
 	// Use query if search is not provided (backward compatibility)
 	if search == "" && query != "" {
 		search = query
+	}
+
+	// Convert GitHub Projects date expressions in search query
+	if search != "" {
+		convertedSearch, err := utils.ConvertSearchQuery(search)
+		if err != nil {
+			// If conversion fails, use original search query and log warning
+			fmt.Fprintf(os.Stderr, "Warning: Failed to convert date expressions in search query: %v\n", err)
+		} else {
+			search = convertedSearch
+		}
 	}
 
 	// Load configuration

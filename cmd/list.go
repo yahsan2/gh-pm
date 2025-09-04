@@ -13,6 +13,7 @@ import (
 	"github.com/yahsan2/gh-pm/pkg/config"
 	"github.com/yahsan2/gh-pm/pkg/issue"
 	"github.com/yahsan2/gh-pm/pkg/project"
+	"github.com/yahsan2/gh-pm/pkg/utils"
 )
 
 var listCmd = &cobra.Command{
@@ -40,6 +41,11 @@ within your project, with additional project-specific field filtering.`,
 
   # Search with query
   gh pm list --search "authentication"
+
+  # Search with GitHub Projects date expressions
+  gh pm list --search "updated:@today"
+  gh pm list --search "created:@today-1w"
+  gh pm list --search "state:open created:>@today-30d"
 
   # JSON output with specific fields
   gh pm list --json number,title,status,priority
@@ -107,6 +113,18 @@ func runList(cmd *cobra.Command, args []string) error {
 	state, _ := cmd.Flags().GetString("state")
 	milestone, _ := cmd.Flags().GetString("milestone")
 	search, _ := cmd.Flags().GetString("search")
+
+	// Convert GitHub Projects date expressions in search query
+	if search != "" {
+		convertedSearch, err := utils.ConvertSearchQuery(search)
+		if err != nil {
+			// If conversion fails, use original search query and log warning
+			fmt.Fprintf(os.Stderr, "Warning: Failed to convert date expressions in search query: %v\n", err)
+		} else {
+			search = convertedSearch
+		}
+	}
+
 	limit, _ := cmd.Flags().GetInt("limit")
 	mention, _ := cmd.Flags().GetString("mention")
 	app, _ := cmd.Flags().GetString("app")
