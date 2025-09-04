@@ -10,10 +10,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/yahsan2/gh-pm/pkg/args"
 	"github.com/yahsan2/gh-pm/pkg/config"
+	"github.com/yahsan2/gh-pm/pkg/filter"
 	"github.com/yahsan2/gh-pm/pkg/issue"
 	"github.com/yahsan2/gh-pm/pkg/project"
-	"github.com/yahsan2/gh-pm/pkg/utils"
 )
 
 var listCmd = &cobra.Command{
@@ -56,20 +57,16 @@ within your project, with additional project-specific field filtering.`,
 }
 
 func init() {
-	// gh issue list compatible flags
-	listCmd.Flags().StringSliceP("label", "l", []string{}, "Filter by label")
-	listCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
-	listCmd.Flags().StringP("author", "A", "", "Filter by author")
-	listCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|all}")
-	listCmd.Flags().StringP("milestone", "m", "", "Filter by milestone number or title")
-	listCmd.Flags().StringP("search", "S", "", "Search issues with query")
-	listCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
-	listCmd.Flags().String("mention", "", "Filter by mention")
-	listCmd.Flags().String("app", "", "Filter by GitHub App author")
+	// Add common gh issue list compatible flags
+	flags := args.DefaultFlags()
+	flags.Limit = "limit" // Override default limit for list command
+	args.AddCommonFlags(listCmd, flags)
 
-	// Project-specific filters
-	listCmd.Flags().String("status", "", "Filter by project status field")
-	listCmd.Flags().String("priority", "", "Filter by project priority field")
+	// Override limit default for list command
+	listCmd.Flags().Lookup("limit").DefValue = "30"
+
+	// Add project-specific flags
+	args.AddProjectFlags(listCmd)
 
 	// Output flags
 	listCmd.Flags().String("json", "", "Output JSON with the specified fields")
@@ -81,57 +78,28 @@ func init() {
 }
 
 type ListCommand struct {
-	config   *config.Config
-	client   *project.Client
-	issueAPI *issue.Client
+	config    *config.Config
+	client    *project.Client
+	issueAPI  *issue.Client
+	searchAPI *issue.SearchClient
 }
 
-type ProjectIssue struct {
-	Number     int                    `json:"number"`
-	Title      string                 `json:"title"`
-	State      string                 `json:"state"`
-	URL        string                 `json:"url"`
-	ID         string                 `json:"id"`
-	Body       string                 `json:"body,omitempty"`
-	Author     string                 `json:"author,omitempty"`
-	Assignees  []string               `json:"assignees,omitempty"`
-	Labels     []string               `json:"labels,omitempty"`
-	Milestone  string                 `json:"milestone,omitempty"`
-	CreatedAt  string                 `json:"createdAt,omitempty"`
-	UpdatedAt  string                 `json:"updatedAt,omitempty"`
-	ClosedAt   string                 `json:"closedAt,omitempty"`
-	Comments   int                    `json:"comments,omitempty"`
-	ProjectURL string                 `json:"projectUrl,omitempty"`
-	Fields     map[string]interface{} `json:"fields,omitempty"`
-}
-
-func runList(cmd *cobra.Command, args []string) error {
-	// Parse flags
-	labels, _ := cmd.Flags().GetStringSlice("label")
-	assignee, _ := cmd.Flags().GetString("assignee")
-	author, _ := cmd.Flags().GetString("author")
-	state, _ := cmd.Flags().GetString("state")
-	milestone, _ := cmd.Flags().GetString("milestone")
-	search, _ := cmd.Flags().GetString("search")
-
-	// Convert GitHub Projects date expressions in search query
-	if search != "" {
-		convertedSearch, err := utils.ConvertSearchQuery(search)
-		if err != nil {
-			// If conversion fails, use original search query and log warning
-			fmt.Fprintf(os.Stderr, "Warning: Failed to convert date expressions in search query: %v\n", err)
-		} else {
-			search = convertedSearch
-		}
+func runList(cmd *cobra.Command, cmdArgs []string) error {
+	// Parse common flags using shared argument parser
+	filters, err := args.ParseCommonFlags(cmd, nil)
+	if err != nil {
+		return fmt.Errorf("failed to parse common flags: %w", err)
 	}
 
-	limit, _ := cmd.Flags().GetInt("limit")
-	mention, _ := cmd.Flags().GetString("mention")
-	app, _ := cmd.Flags().GetString("app")
+	// Parse project-specific flags
+	if err := args.ParseProjectFlags(cmd, filters); err != nil {
+		return fmt.Errorf("failed to parse project flags: %w", err)
+	}
 
-	// Project-specific filters
-	statusFilter, _ := cmd.Flags().GetString("status")
-	priorityFilter, _ := cmd.Flags().GetString("priority")
+	// Override limit default if not set
+	if filters.Limit == 0 {
+		filters.Limit = 30
+	}
 
 	// Output flags
 	jsonFields, _ := cmd.Flags().GetString("json")
@@ -163,11 +131,18 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	issueClient := issue.NewClient()
 
+	// Create search client
+	searchClient, err := issue.NewSearchClient(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create search client: %w", err)
+	}
+
 	// Create command executor
 	command := &ListCommand{
-		config:   cfg,
-		client:   projectClient,
-		issueAPI: issueClient,
+		config:    cfg,
+		client:    projectClient,
+		issueAPI:  issueClient,
+		searchAPI: searchClient,
 	}
 
 	// Get project ID
@@ -195,49 +170,25 @@ func runList(cmd *cobra.Command, args []string) error {
 		cfg.SetProjectID(projectID)
 	}
 
-	// Fetch project items with filters
-	issues, err := command.fetchProjectIssues(projectID, limit)
+	// Fetch project items with filters using shared search client
+	issues, err := command.searchAPI.FetchProjectIssues(projectID, filters.Limit)
 	if err != nil {
 		return fmt.Errorf("failed to fetch project issues: %w", err)
 	}
 
-	// Apply local filters
-	filtered := command.filterIssues(issues, FilterOptions{
-		Labels:    labels,
-		Assignee:  assignee,
-		Author:    author,
-		State:     state,
-		Milestone: milestone,
-		Search:    search,
-		Mention:   mention,
-		App:       app,
-		Status:    statusFilter,
-		Priority:  priorityFilter,
-	})
+	// Apply local filters using shared filtering logic
+	filtered := command.searchAPI.FilterProjectIssues(issues, filters)
 
 	// Handle JSON output
 	if jsonFields != "" {
-		return outputJSON(filtered, jsonFields, jqExpr, template)
+		return command.outputJSON(filtered, jsonFields, jqExpr, template)
 	}
 
 	// Default table output
-	return outputTable(filtered)
+	return command.outputTable(filtered)
 }
 
-type FilterOptions struct {
-	Labels    []string
-	Assignee  string
-	Author    string
-	State     string
-	Milestone string
-	Search    string
-	Mention   string
-	App       string
-	Status    string
-	Priority  string
-}
-
-func (c *ListCommand) fetchProjectIssues(projectID string, limit int) ([]ProjectIssue, error) {
+func (c *ListCommand) fetchProjectIssues(projectID string, limit int) ([]filter.ProjectIssue, error) {
 	query := `
 		query($projectId: ID!, $endCursor: String, $limit: Int!) {
 			node(id: $projectId) {
@@ -332,7 +283,7 @@ func (c *ListCommand) fetchProjectIssues(projectID string, limit int) ([]Project
 			}
 		}`
 
-	var allIssues []ProjectIssue
+	var allIssues []filter.ProjectIssue
 	var endCursor *string
 
 	for {
@@ -403,7 +354,7 @@ func (c *ListCommand) fetchProjectIssues(projectID string, limit int) ([]Project
 				continue // Skip non-issues
 			}
 
-			issue := ProjectIssue{
+			issue := filter.ProjectIssue{
 				Number:    item.Content.Number,
 				Title:     item.Content.Title,
 				State:     strings.ToLower(item.Content.State),
@@ -473,138 +424,9 @@ func (c *ListCommand) fetchProjectIssues(projectID string, limit int) ([]Project
 	return allIssues, nil
 }
 
-func (c *ListCommand) filterIssues(issues []ProjectIssue, filters FilterOptions) []ProjectIssue {
-	var filtered []ProjectIssue
+// The filtering logic is now handled by the shared SearchClient
 
-	for _, issue := range issues {
-		// State filter
-		if filters.State != "" && filters.State != "all" {
-			if filters.State != issue.State {
-				continue
-			}
-		}
-
-		// Label filter
-		if len(filters.Labels) > 0 {
-			hasLabel := false
-			for _, filterLabel := range filters.Labels {
-				for _, issueLabel := range issue.Labels {
-					if strings.EqualFold(issueLabel, filterLabel) {
-						hasLabel = true
-						break
-					}
-				}
-				if hasLabel {
-					break
-				}
-			}
-			if !hasLabel {
-				continue
-			}
-		}
-
-		// Assignee filter
-		if filters.Assignee != "" {
-			hasAssignee := false
-			targetAssignee := filters.Assignee
-			if targetAssignee == "@me" {
-				// Get current user
-				cmd := exec.Command("gh", "api", "user", "--jq", ".login")
-				output, err := cmd.Output()
-				if err == nil {
-					targetAssignee = strings.TrimSpace(string(output))
-				}
-			}
-
-			for _, assignee := range issue.Assignees {
-				if strings.EqualFold(assignee, targetAssignee) {
-					hasAssignee = true
-					break
-				}
-			}
-			if !hasAssignee {
-				continue
-			}
-		}
-
-		// Author filter
-		if filters.Author != "" && !strings.EqualFold(issue.Author, filters.Author) {
-			continue
-		}
-
-		// Milestone filter
-		if filters.Milestone != "" && !strings.EqualFold(issue.Milestone, filters.Milestone) {
-			continue
-		}
-
-		// Search filter (basic text search in title and body)
-		if filters.Search != "" {
-			searchLower := strings.ToLower(filters.Search)
-			if !strings.Contains(strings.ToLower(issue.Title), searchLower) &&
-				!strings.Contains(strings.ToLower(issue.Body), searchLower) {
-				continue
-			}
-		}
-
-		// Status filter (project field)
-		if filters.Status != "" {
-			statusValue, ok := issue.Fields["Status"].(string)
-			if !ok || !matchesFieldValue(c.config, "status", filters.Status, statusValue) {
-				continue
-			}
-		}
-
-		// Priority filter (project field)
-		if filters.Priority != "" {
-			priorityValue, ok := issue.Fields["Priority"].(string)
-			if !ok {
-				continue
-			}
-
-			// Support comma-separated values
-			priorityFilters := strings.Split(filters.Priority, ",")
-			matched := false
-			for _, pf := range priorityFilters {
-				if matchesFieldValue(c.config, "priority", strings.TrimSpace(pf), priorityValue) {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				continue
-			}
-		}
-
-		filtered = append(filtered, issue)
-	}
-
-	return filtered
-}
-
-func matchesFieldValue(cfg *config.Config, fieldName, filterValue, actualValue string) bool {
-	// Direct match
-	if strings.EqualFold(filterValue, actualValue) {
-		return true
-	}
-
-	// Check config field mappings
-	if field, ok := cfg.Fields[fieldName]; ok {
-		// Check if filter value is a mapped key
-		if mappedValue, ok := field.Values[strings.ToLower(filterValue)]; ok {
-			return strings.EqualFold(mappedValue, actualValue)
-		}
-		// Check reverse mapping
-		for key, value := range field.Values {
-			if strings.EqualFold(value, filterValue) && strings.EqualFold(key, actualValue) {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-func outputTable(issues []ProjectIssue) error {
+func (c *ListCommand) outputTable(issues []filter.ProjectIssue) error {
 	if len(issues) == 0 {
 		fmt.Println("No issues found")
 		return nil
@@ -650,7 +472,7 @@ func outputTable(issues []ProjectIssue) error {
 	return w.Flush()
 }
 
-func outputJSON(issues []ProjectIssue, fields, jqExpr, template string) error {
+func (c *ListCommand) outputJSON(issues []filter.ProjectIssue, fields, jqExpr, template string) error {
 	// If specific fields requested, filter the output
 	var output interface{}
 

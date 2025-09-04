@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,9 +11,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/yahsan2/gh-pm/pkg/config"
+	"github.com/yahsan2/gh-pm/pkg/filter"
 	"github.com/yahsan2/gh-pm/pkg/issue"
 	"github.com/yahsan2/gh-pm/pkg/project"
-	"github.com/yahsan2/gh-pm/pkg/utils"
 )
 
 var triageCmd = &cobra.Command{
@@ -58,19 +57,13 @@ type TriageCommand struct {
 	config     *config.Config
 	client     *project.Client
 	issueAPI   *issue.Client
+	searchAPI  *issue.SearchClient
 	urlBuilder *project.URLBuilder
-}
-
-type GitHubIssue struct {
-	Number int    `json:"number"`
-	Title  string `json:"title"`
-	ID     string `json:"node_id"`
-	URL    string `json:"html_url"`
 }
 
 // IssueUpdate holds the updates to be applied to an issue
 type IssueUpdate struct {
-	Issue          GitHubIssue
+	Issue          filter.GitHubIssue
 	ItemID         string
 	StatusChoice   *string           // nil means skip
 	EstimateChoice *string           // nil means skip
@@ -168,11 +161,18 @@ func runTriage(cmd *cobra.Command, args []string) error {
 	// Create URL builder
 	urlBuilder := project.NewURLBuilder(cfg, projectClient)
 
+	// Create search client
+	searchClient, err := issue.NewSearchClient(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create search client: %w", err)
+	}
+
 	// Create command executor
 	command := &TriageCommand{
 		config:     cfg,
 		client:     projectClient,
 		issueAPI:   issueClient,
+		searchAPI:  searchClient,
 		urlBuilder: urlBuilder,
 	}
 
@@ -180,8 +180,12 @@ func runTriage(cmd *cobra.Command, args []string) error {
 }
 
 func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool) error {
-	// Execute GitHub search query
-	issues, err := c.searchIssues(triageConfig.Query)
+	// Create filters from triage query
+	filters := filter.NewIssueFilters()
+	filters.Search = triageConfig.Query
+
+	// Execute GitHub search query using shared search client
+	issues, err := c.searchAPI.SearchIssues(filters)
 	if err != nil {
 		return fmt.Errorf("failed to search issues: %w", err)
 	}
@@ -434,167 +438,7 @@ func (c *TriageCommand) Execute(triageConfig config.TriageConfig, listOnly bool)
 	return nil
 }
 
-func (c *TriageCommand) searchIssues(query string) ([]GitHubIssue, error) {
-	// Convert GitHub Projects date expressions in query
-	if query != "" {
-		convertedQuery, err := utils.ConvertSearchQuery(query)
-		if err != nil {
-			// If conversion fails, use original query and log warning
-			fmt.Fprintf(os.Stderr, "Warning: Failed to convert date expressions in query: %v\n", err)
-		} else {
-			query = convertedQuery
-		}
-	}
-
-	// Parse query to extract field filters
-	fieldFilters := make(map[string]string) // field name -> filter value
-	fieldExcludes := make(map[string]bool)  // field name -> true if should be empty/unset
-	var labelExcludes []string
-
-	// Get available field names from metadata
-	availableFields := make(map[string]bool)
-	if c.config.Metadata != nil && c.config.Metadata.Fields != nil {
-		for _, field := range c.config.Metadata.Fields {
-			availableFields[field.Name] = true
-		}
-	}
-
-	parts := strings.Split(query, " ")
-	for _, part := range parts {
-		// Check for label exclusions
-		if strings.HasPrefix(part, "-label:") {
-			labelExcludes = append(labelExcludes, strings.TrimPrefix(part, "-label:"))
-			continue
-		}
-
-		// Check for field exclusions (-has:fieldname)
-		if strings.HasPrefix(part, "-has:") {
-			fieldName := strings.TrimPrefix(part, "-has:")
-			fieldFound := false
-
-			// Try to find the field in metadata (case-insensitive)
-			for availField := range availableFields {
-				if strings.EqualFold(availField, fieldName) {
-					fieldExcludes[availField] = true
-					fieldFound = true
-					break
-				}
-			}
-
-			// If not found in metadata, check config field names
-			if !fieldFound && c.config.Fields != nil {
-				// Check if it's a config field name (like "status", "priority", "estimate")
-				if configField, ok := c.config.Fields[strings.ToLower(fieldName)]; ok {
-					// Use the actual field name from config
-					actualFieldName := configField.Field
-					if actualFieldName != "" {
-						// Check if this field exists in metadata
-						for availField := range availableFields {
-							if strings.EqualFold(availField, actualFieldName) {
-								fieldExcludes[availField] = true
-								break
-							}
-						}
-					}
-				} else {
-					// Special case for "estimate" which might be "Estimate" field
-					for availField := range availableFields {
-						if strings.EqualFold(availField, fieldName) {
-							fieldExcludes[availField] = true
-							break
-						}
-					}
-				}
-			}
-			continue
-		}
-
-		// Check for field filters dynamically
-		if strings.Contains(part, ":") {
-			colonIdx := strings.Index(part, ":")
-			fieldName := part[:colonIdx]
-			fieldValue := part[colonIdx+1:]
-
-			// Try to find field in metadata (case-insensitive) or config
-			fieldFound := false
-
-			// First check metadata fields (case-insensitive)
-			for availField := range availableFields {
-				if strings.EqualFold(availField, fieldName) {
-					fieldFilters[availField] = fieldValue
-					fieldFound = true
-					break
-				}
-			}
-
-			// If not found in metadata, check config field names
-			if !fieldFound && c.config.Fields != nil {
-				// Check if it's a config field name (like "status", "priority")
-				if configField, ok := c.config.Fields[strings.ToLower(fieldName)]; ok {
-					// Use the actual field name from config
-					actualFieldName := configField.Field
-					if actualFieldName != "" {
-						fieldFilters[actualFieldName] = fieldValue
-					}
-				}
-			}
-		}
-	}
-
-	// If we have field filters/excludes and project metadata, use optimized GraphQL query
-	if (len(fieldFilters) > 0 || len(fieldExcludes) > 0) && c.config.Metadata != nil && c.config.Metadata.Project.ID != "" {
-		return c.searchIssuesWithProjectFields(fieldFilters, fieldExcludes, labelExcludes)
-	}
-
-	// Use GitHub search API with the full query
-	var repo string
-	if len(c.config.Repositories) > 0 {
-		repo = c.config.Repositories[0]
-	}
-
-	// Add repo to the search query if specified
-	if repo != "" && !strings.Contains(query, "repo:") {
-		query = fmt.Sprintf("repo:%s %s", repo, query)
-	}
-
-	fmt.Printf("Searching issues with query: %s\n", query)
-
-	// Use gh issue list with --search option to properly filter issues
-	// GitHub now supports @today-1d syntax directly
-	args := []string{"issue", "list", "--search", query, "--json", "number,title,id,url"}
-
-	cmd := exec.Command("gh", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("failed to search issues: %w, output: %s", err, string(output))
-	}
-
-	// Parse JSON output
-	var issues []struct {
-		Number int    `json:"number"`
-		Title  string `json:"title"`
-		ID     string `json:"id"`
-		URL    string `json:"url"`
-	}
-
-	if err := json.Unmarshal(output, &issues); err != nil {
-		return nil, fmt.Errorf("failed to parse issues: %w", err)
-	}
-
-	// Convert to GitHubIssue format
-	var result []GitHubIssue
-	for _, issue := range issues {
-		result = append(result, GitHubIssue{
-			Number: issue.Number,
-			Title:  issue.Title,
-			ID:     issue.ID,
-			URL:    issue.URL,
-		})
-	}
-
-	fmt.Printf("Found %d issues matching query\n", len(result))
-	return result, nil
-}
+// Issue search is now handled by the shared SearchClient
 
 func (c *TriageCommand) applyLabels(issueNumber int, labels []string) error {
 	// Get current repository from config
@@ -782,7 +626,7 @@ func (c *TriageCommand) updateEstimateField(projectID, itemID, estimate string, 
 	return err
 }
 
-func (c *TriageCommand) collectStatusChoice(issue GitHubIssue, reader *bufio.Reader, fields []project.Field) *string {
+func (c *TriageCommand) collectStatusChoice(issue filter.GitHubIssue, reader *bufio.Reader, fields []project.Field) *string {
 	// Find Status field
 	var statusField *project.Field
 	for _, field := range fields {
@@ -867,7 +711,7 @@ func (c *TriageCommand) collectStatusChoice(issue GitHubIssue, reader *bufio.Rea
 	return &selectedStatus
 }
 
-func (c *TriageCommand) collectEstimateChoice(issue GitHubIssue, reader *bufio.Reader) *string {
+func (c *TriageCommand) collectEstimateChoice(issue filter.GitHubIssue, reader *bufio.Reader) *string {
 	fmt.Printf("\nEnter estimate for issue #%d: %s\n", issue.Number, issue.Title)
 	fmt.Print("Estimate (e.g., '2h', '1d', '3pts', or press Enter to skip): ")
 
@@ -886,7 +730,7 @@ func (c *TriageCommand) collectEstimateChoice(issue GitHubIssue, reader *bufio.R
 	return &input
 }
 
-func (c *TriageCommand) collectFieldChoice(issue GitHubIssue, reader *bufio.Reader, fieldName string, fields []project.Field) *string {
+func (c *TriageCommand) collectFieldChoice(issue filter.GitHubIssue, reader *bufio.Reader, fieldName string, fields []project.Field) *string {
 	// Find the target field
 	var targetField *project.Field
 	for _, field := range fields {
@@ -998,247 +842,9 @@ func (c *TriageCommand) collectFieldChoice(issue GitHubIssue, reader *bufio.Read
 	}
 }
 
-func (c *TriageCommand) searchIssuesWithProjectFields(fieldFilters map[string]string, fieldExcludes map[string]bool, labelExcludes []string) ([]GitHubIssue, error) {
-	projectID := c.config.Metadata.Project.ID
+// Project-based search with field filtering is now handled by the shared SearchClient
 
-	// Build GraphQL query to get all project items with field values
-	query := `
-		query($projectId: ID!, $endCursor: String) {
-			node(id: $projectId) {
-				... on ProjectV2 {
-					items(first: 100, after: $endCursor) {
-						pageInfo {
-							hasNextPage
-							endCursor
-						}
-						nodes {
-							id
-							databaseId
-							content {
-								... on Issue {
-									id
-									number
-									title
-									url
-									state
-									labels(first: 100) {
-										nodes {
-											name
-										}
-									}
-								}
-							}
-							fieldValues(first: 20) {
-								nodes {
-									... on ProjectV2ItemFieldSingleSelectValue {
-										field {
-											... on ProjectV2SingleSelectField {
-												id
-												name
-											}
-										}
-										optionId
-										name
-									}
-									... on ProjectV2ItemFieldTextValue {
-										field {
-											... on ProjectV2Field {
-												id
-												name
-											}
-										}
-										text
-									}
-									... on ProjectV2ItemFieldNumberValue {
-										field {
-											... on ProjectV2Field {
-												id
-												name
-											}
-										}
-										number
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}`
-
-	var allItems []GitHubIssue
-	var endCursor *string
-
-	// Prepare field option IDs to filter by
-	filterOptionIDs := make(map[string]string) // fieldID -> optionID
-
-	// Map field filters to option IDs using metadata dynamically
-	for fieldName, filterValue := range fieldFilters {
-		if fieldMeta := c.config.GetFieldMetadata(fieldName); fieldMeta != nil && filterValue != "" {
-			if optionID, ok := fieldMeta.Options[filterValue]; ok {
-				filterOptionIDs[fieldMeta.ID] = optionID
-			}
-		}
-	}
-
-	fmt.Printf("Fetching project items with field values...\n")
-
-	// Paginate through all project items
-	for {
-		variables := map[string]interface{}{
-			"projectId": projectID,
-		}
-		if endCursor != nil {
-			variables["endCursor"] = *endCursor
-		}
-
-		var result struct {
-			Node struct {
-				Items struct {
-					PageInfo struct {
-						HasNextPage bool   `json:"hasNextPage"`
-						EndCursor   string `json:"endCursor"`
-					} `json:"pageInfo"`
-					Nodes []struct {
-						ID         string `json:"id"`
-						DatabaseID int    `json:"databaseId"`
-						Content    struct {
-							ID     string `json:"id"`
-							Number int    `json:"number"`
-							Title  string `json:"title"`
-							URL    string `json:"url"`
-							State  string `json:"state"`
-							Labels struct {
-								Nodes []struct {
-									Name string `json:"name"`
-								} `json:"nodes"`
-							} `json:"labels"`
-						} `json:"content"`
-						FieldValues struct {
-							Nodes []map[string]interface{} `json:"nodes"`
-						} `json:"fieldValues"`
-					} `json:"nodes"`
-				} `json:"items"`
-			} `json:"node"`
-		}
-
-		err := c.issueAPI.GetGraphQLClient().Do(query, variables, &result)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch project items: %w", err)
-		}
-
-		// Process items
-		for _, item := range result.Node.Items.Nodes {
-			// Skip if not an issue or closed
-			if item.Content.Number == 0 || item.Content.State != "OPEN" {
-				continue
-			}
-
-			// Check label exclusions
-			skipItem := false
-			for _, excludeLabel := range labelExcludes {
-				for _, label := range item.Content.Labels.Nodes {
-					if label.Name == excludeLabel {
-						skipItem = true
-						break
-					}
-				}
-				if skipItem {
-					break
-				}
-			}
-			if skipItem {
-				continue
-			}
-
-			// Build a map of field values for this item
-			itemFieldValues := make(map[string]interface{})
-			for _, fieldValueNode := range item.FieldValues.Nodes {
-				if fieldData, ok := fieldValueNode["field"].(map[string]interface{}); ok {
-					if fieldID, ok := fieldData["id"].(string); ok {
-						if fieldName, ok := fieldData["name"].(string); ok {
-							// Check for different field value types
-							if optionID, ok := fieldValueNode["optionId"].(string); ok {
-								// Single select field
-								itemFieldValues[fieldID] = optionID
-							} else if text, ok := fieldValueNode["text"].(string); ok {
-								// Text field
-								itemFieldValues[fieldName] = text
-							} else if number, ok := fieldValueNode["number"].(float64); ok {
-								// Number field
-								itemFieldValues[fieldName] = number
-							}
-						}
-					}
-				}
-			}
-
-			// Check field filters
-			matchesAllFilters := true
-			for fieldID, requiredOptionID := range filterOptionIDs {
-				if value, exists := itemFieldValues[fieldID]; exists {
-					if value != requiredOptionID {
-						matchesAllFilters = false
-						break
-					}
-				} else {
-					matchesAllFilters = false
-					break
-				}
-			}
-
-			// Check field exclusions (e.g., -has:estimate)
-			if matchesAllFilters {
-				for excludeFieldName := range fieldExcludes {
-					// Check if this field has any value
-					hasValue := false
-					for fieldName, value := range itemFieldValues {
-						if strings.EqualFold(fieldName, excludeFieldName) {
-							// Check if the value is not empty
-							switch v := value.(type) {
-							case string:
-								if v != "" {
-									hasValue = true
-								}
-							case float64:
-								hasValue = true // any number means it has a value
-							default:
-								if v != nil {
-									hasValue = true
-								}
-							}
-							break
-						}
-					}
-					if hasValue {
-						matchesAllFilters = false
-						break
-					}
-				}
-			}
-
-			if matchesAllFilters {
-				allItems = append(allItems, GitHubIssue{
-					Number: item.Content.Number,
-					Title:  item.Content.Title,
-					ID:     item.Content.ID,
-					URL:    item.Content.URL,
-				})
-			}
-		}
-
-		// Check if there are more pages
-		if !result.Node.Items.PageInfo.HasNextPage {
-			break
-		}
-		endCursor = &result.Node.Items.PageInfo.EndCursor
-	}
-
-	fmt.Printf("Found %d issues matching criteria\n", len(allItems))
-	return allItems, nil
-}
-
-func (c *TriageCommand) displayIssuesList(issues []GitHubIssue, triageConfig config.TriageConfig) error {
+func (c *TriageCommand) displayIssuesList(issues []filter.GitHubIssue, triageConfig config.TriageConfig) error {
 	// Display instruction if configured
 	if triageConfig.Instruction != "" {
 		// Use dim cyan for instruction

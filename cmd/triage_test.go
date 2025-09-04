@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/yahsan2/gh-pm/pkg/config"
+	"github.com/yahsan2/gh-pm/pkg/filter"
 	"github.com/yahsan2/gh-pm/pkg/project"
 )
 
@@ -98,7 +99,7 @@ func TestCollectStatusChoice_OptionsOrder(t *testing.T) {
 			}
 
 			// Create mock issue
-			issue := GitHubIssue{
+			issue := filter.GitHubIssue{
 				Number: 1,
 				Title:  "Test Issue",
 			}
@@ -216,7 +217,7 @@ func TestCollectFieldChoice_OptionsOrder(t *testing.T) {
 			}
 
 			// Create mock issue
-			issue := GitHubIssue{
+			issue := filter.GitHubIssue{
 				Number: 1,
 				Title:  "Test Issue",
 			}

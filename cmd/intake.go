@@ -1,18 +1,16 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/yahsan2/gh-pm/pkg/args"
 	"github.com/yahsan2/gh-pm/pkg/config"
+	"github.com/yahsan2/gh-pm/pkg/filter"
 	"github.com/yahsan2/gh-pm/pkg/issue"
 	"github.com/yahsan2/gh-pm/pkg/project"
-	"github.com/yahsan2/gh-pm/pkg/utils"
 )
 
 var intakeCmd = &cobra.Command{
@@ -49,16 +47,8 @@ This command will:
 }
 
 func init() {
-	// gh issue list compatible flags
-	intakeCmd.Flags().StringSliceP("label", "l", []string{}, "Filter by label")
-	intakeCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
-	intakeCmd.Flags().StringP("author", "A", "", "Filter by author")
-	intakeCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|all}")
-	intakeCmd.Flags().StringP("milestone", "m", "", "Filter by milestone number or title")
-	intakeCmd.Flags().StringP("search", "S", "", "Search issues with query")
-	intakeCmd.Flags().IntP("limit", "L", 100, "Maximum number of issues to fetch")
-	intakeCmd.Flags().String("mention", "", "Filter by mention")
-	intakeCmd.Flags().String("app", "", "Filter by GitHub App author")
+	// Add common gh issue list compatible flags
+	args.AddCommonFlags(intakeCmd, nil)
 
 	// Deprecated but kept for compatibility
 	intakeCmd.Flags().String("query", "", "GitHub search query (deprecated, use --search)")
@@ -72,53 +62,28 @@ func init() {
 }
 
 type IntakeCommand struct {
-	config   *config.Config
-	client   *project.Client
-	issueAPI *issue.Client
+	config    *config.Config
+	client    *project.Client
+	issueAPI  *issue.Client
+	searchAPI *issue.SearchClient
 }
 
-type IssueFilters struct {
-	Search    string
-	Labels    []string
-	Assignee  string
-	Author    string
-	State     string
-	Milestone string
-	Mention   string
-	App       string
-	Limit     int
-}
+func runIntake(cmd *cobra.Command, cmdArgs []string) error {
+	// Parse common flags using shared argument parser
+	filters, err := args.ParseCommonFlags(cmd, nil)
+	if err != nil {
+		return fmt.Errorf("failed to parse common flags: %w", err)
+	}
 
-func runIntake(cmd *cobra.Command, args []string) error {
-	// Parse flags
+	// Handle deprecated query flag for backward compatibility
 	query, _ := cmd.Flags().GetString("query")
-	search, _ := cmd.Flags().GetString("search")
-	labels, _ := cmd.Flags().GetStringSlice("label")
-	assignee, _ := cmd.Flags().GetString("assignee")
-	author, _ := cmd.Flags().GetString("author")
-	state, _ := cmd.Flags().GetString("state")
-	milestone, _ := cmd.Flags().GetString("milestone")
-	mention, _ := cmd.Flags().GetString("mention")
-	app, _ := cmd.Flags().GetString("app")
-	limit, _ := cmd.Flags().GetInt("limit")
+	if filters.Search == "" && query != "" {
+		filters.Search = query
+	}
+
+	// Parse intake-specific flags
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	applyFlags, _ := cmd.Flags().GetStringSlice("apply")
-
-	// Use query if search is not provided (backward compatibility)
-	if search == "" && query != "" {
-		search = query
-	}
-
-	// Convert GitHub Projects date expressions in search query
-	if search != "" {
-		convertedSearch, err := utils.ConvertSearchQuery(search)
-		if err != nil {
-			// If conversion fails, use original search query and log warning
-			fmt.Fprintf(os.Stderr, "Warning: Failed to convert date expressions in search query: %v\n", err)
-		} else {
-			search = convertedSearch
-		}
-	}
 
 	// Load configuration
 	cfg, err := config.LoadConfig()
@@ -139,11 +104,18 @@ func runIntake(cmd *cobra.Command, args []string) error {
 
 	issueClient := issue.NewClient()
 
+	// Create search client
+	searchClient, err := issue.NewSearchClient(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create search client: %w", err)
+	}
+
 	// Create command executor
 	command := &IntakeCommand{
-		config:   cfg,
-		client:   projectClient,
-		issueAPI: issueClient,
+		config:    cfg,
+		client:    projectClient,
+		issueAPI:  issueClient,
+		searchAPI: searchClient,
 	}
 
 	// Parse apply flags
@@ -158,25 +130,12 @@ func runIntake(cmd *cobra.Command, args []string) error {
 		applyFields[field] = value
 	}
 
-	// Build filters
-	filters := IssueFilters{
-		Search:    search,
-		Labels:    labels,
-		Assignee:  assignee,
-		Author:    author,
-		State:     state,
-		Milestone: milestone,
-		Mention:   mention,
-		App:       app,
-		Limit:     limit,
-	}
-
 	return command.ExecuteWithFilters(filters, dryRun, applyFields)
 }
 
-func (c *IntakeCommand) ExecuteWithFilters(filters IssueFilters, dryRun bool, applyFields map[string]string) error {
-	// Search for issues using filters
-	issues, err := c.searchIssuesWithFilters(filters)
+func (c *IntakeCommand) ExecuteWithFilters(filters *filter.IssueFilters, dryRun bool, applyFields map[string]string) error {
+	// Search for issues using shared search client
+	issues, err := c.searchAPI.SearchIssues(filters)
 	if err != nil {
 		return fmt.Errorf("failed to search issues: %w", err)
 	}
@@ -192,7 +151,7 @@ func (c *IntakeCommand) ExecuteWithFilters(filters IssueFilters, dryRun bool, ap
 	return c.processIssues(issues, dryRun, applyFields)
 }
 
-func (c *IntakeCommand) processIssues(issues []GitHubIssue, dryRun bool, applyFields map[string]string) error {
+func (c *IntakeCommand) processIssues(issues []filter.GitHubIssue, dryRun bool, applyFields map[string]string) error {
 	// Get project ID
 	var projectID string
 	if c.config.Project.Name != "" || c.config.Project.Number > 0 {
@@ -224,8 +183,8 @@ func (c *IntakeCommand) processIssues(issues []GitHubIssue, dryRun bool, applyFi
 		}
 	}
 
-	// Get issues already in project
-	existingIssues, err := c.getProjectIssues(projectID)
+	// Get issues already in project using shared search client
+	existingIssues, err := c.searchAPI.GetProjectIssues(projectID)
 	if err != nil {
 		return fmt.Errorf("failed to get existing project issues: %w", err)
 	}
@@ -237,7 +196,7 @@ func (c *IntakeCommand) processIssues(issues []GitHubIssue, dryRun bool, applyFi
 	}
 
 	// Filter out issues already in project
-	var issuesToAdd []GitHubIssue
+	var issuesToAdd []filter.GitHubIssue
 	for _, issue := range issues {
 		if !existingMap[issue.Number] {
 			issuesToAdd = append(issuesToAdd, issue)
@@ -345,183 +304,7 @@ func (c *IntakeCommand) processIssues(issues []GitHubIssue, dryRun bool, applyFi
 	return nil
 }
 
-func (c *IntakeCommand) searchIssuesWithFilters(filters IssueFilters) ([]GitHubIssue, error) {
-	var args []string
-
-	// Use configured repository
-	if len(c.config.Repositories) > 0 {
-		args = append(args, "issue", "list", "--repo", c.config.Repositories[0])
-	} else {
-		args = append(args, "issue", "list")
-	}
-
-	// Add state filter
-	if filters.State != "" {
-		args = append(args, "--state", filters.State)
-	} else {
-		args = append(args, "--state", "open")
-	}
-
-	// Add label filters
-	for _, label := range filters.Labels {
-		args = append(args, "--label", label)
-	}
-
-	// Add assignee filter
-	if filters.Assignee != "" {
-		args = append(args, "--assignee", filters.Assignee)
-	}
-
-	// Add author filter
-	if filters.Author != "" {
-		args = append(args, "--author", filters.Author)
-	}
-
-	// Add milestone filter
-	if filters.Milestone != "" {
-		args = append(args, "--milestone", filters.Milestone)
-	}
-
-	// Add mention filter
-	if filters.Mention != "" {
-		args = append(args, "--mention", filters.Mention)
-	}
-
-	// Add app filter
-	if filters.App != "" {
-		args = append(args, "--app", filters.App)
-	}
-
-	// Add search filter
-	if filters.Search != "" {
-		args = append(args, "--search", filters.Search)
-	}
-
-	// Add limit
-	if filters.Limit > 0 {
-		args = append(args, "--limit", fmt.Sprintf("%d", filters.Limit))
-	} else {
-		args = append(args, "--limit", "100")
-	}
-
-	// Add JSON output
-	args = append(args, "--json", "number,title,url,id")
-
-	fmt.Printf("Fetching issues with filters...\n")
-
-	cmd := exec.Command("gh", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list issues: %w\nOutput: %s", err, string(output))
-	}
-
-	var issues []struct {
-		Number int    `json:"number"`
-		Title  string `json:"title"`
-		URL    string `json:"url"`
-		ID     string `json:"id"`
-	}
-
-	if err := json.Unmarshal(output, &issues); err != nil {
-		return nil, fmt.Errorf("failed to parse issues: %w", err)
-	}
-
-	// Convert to GitHubIssue format
-	var result []GitHubIssue
-	for _, issue := range issues {
-		result = append(result, GitHubIssue{
-			Number: issue.Number,
-			Title:  issue.Title,
-			ID:     issue.ID,
-			URL:    issue.URL,
-		})
-	}
-
-	return result, nil
-}
-
-func (c *IntakeCommand) getProjectIssues(projectID string) ([]GitHubIssue, error) {
-	// Use GraphQL to get all issues in the project
-	query := `
-		query($projectId: ID!, $endCursor: String) {
-			node(id: $projectId) {
-				... on ProjectV2 {
-					items(first: 100, after: $endCursor) {
-						pageInfo {
-							hasNextPage
-							endCursor
-						}
-						nodes {
-							content {
-								... on Issue {
-									id
-									number
-									title
-									url
-								}
-							}
-						}
-					}
-				}
-			}
-		}`
-
-	var allIssues []GitHubIssue
-	var endCursor *string
-
-	for {
-		variables := map[string]interface{}{
-			"projectId": projectID,
-		}
-		if endCursor != nil {
-			variables["endCursor"] = *endCursor
-		}
-
-		var result struct {
-			Node struct {
-				Items struct {
-					PageInfo struct {
-						HasNextPage bool   `json:"hasNextPage"`
-						EndCursor   string `json:"endCursor"`
-					} `json:"pageInfo"`
-					Nodes []struct {
-						Content struct {
-							ID     string `json:"id"`
-							Number int    `json:"number"`
-							Title  string `json:"title"`
-							URL    string `json:"url"`
-						} `json:"content"`
-					} `json:"nodes"`
-				} `json:"items"`
-			} `json:"node"`
-		}
-
-		err := c.issueAPI.GetGraphQLClient().Do(query, variables, &result)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch project items: %w", err)
-		}
-
-		// Process items
-		for _, item := range result.Node.Items.Nodes {
-			if item.Content.Number > 0 { // Skip non-issues
-				allIssues = append(allIssues, GitHubIssue{
-					Number: item.Content.Number,
-					Title:  item.Content.Title,
-					ID:     item.Content.ID,
-					URL:    item.Content.URL,
-				})
-			}
-		}
-
-		// Check if there are more pages
-		if !result.Node.Items.PageInfo.HasNextPage {
-			break
-		}
-		endCursor = &result.Node.Items.PageInfo.EndCursor
-	}
-
-	return allIssues, nil
-}
+// Search and project issue retrieval logic is now handled by shared SearchClient
 
 func (c *IntakeCommand) updateProjectField(projectID, itemID, fieldName, value string, fields []project.Field) error {
 	// Find the field by name
