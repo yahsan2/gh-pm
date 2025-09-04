@@ -1,5 +1,6 @@
 # .golangci.yml
 # golangci-lint configuration for gh-pm project
+# This file requires golangci-lint v1.62.0 or higher
 
 run:
   timeout: 5m
@@ -14,7 +15,7 @@ linters:
     - misspell
     - gofmt
     - goimports
-  
+
   disable:
     - unused
 
@@ -27,12 +28,12 @@ issues:
     - dist
     - vendor
     - .worktree
-  
+
   exclude-rules:
     - path: _test\.go
       linters:
         - errcheck
-    
+
     # Exclude fmt.Print* from errcheck
     - text: "Error return value of `fmt\\.(Print|Printf|Println|Fprint|Fprintf|Fprintln)` is not checked"
       linters:

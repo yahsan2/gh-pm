@@ -1,0 +1,38 @@
+repos:
+  # gofmt - Format Go code
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+
+  # golangci-lint - Go linters
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.62.2
+    hooks:
+      - id: golangci-lint
+        args: [--timeout=3m]
+
+  # Additional useful Go hooks
+  - repo: local
+    hooks:
+      - id: go-imports
+        name: go imports
+        entry: /Users/yahsan2/go/bin/goimports -w -local github.com/yahsan2/gh-pm
+        language: system
+        types: [go]
+        pass_filenames: true
+
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-vet      # Run go vet
+
+  # Standard hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: [--maxkb=1024]
