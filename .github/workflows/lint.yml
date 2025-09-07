@@ -41,5 +41,8 @@ jobs:
           exit 1
         fi
 
+    - name: Download dependencies
+      run: go mod download
+
     - name: Check go vet
       run: go vet ./...
