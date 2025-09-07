@@ -210,13 +210,6 @@ func TestIntakeCommand_FieldMapping(t *testing.T) {
 			// Test field value matching logic directly without API client
 			// This tests the core logic without requiring GitHub authentication
 
-			actualFieldName := tt.fieldName
-			if tt.fieldName == "status" {
-				actualFieldName = "Status"
-			} else if tt.fieldName == "priority" {
-				actualFieldName = "Priority"
-			}
-
 			// Simulate the field matching logic
 			var matches bool
 			if fieldConfig, exists := cfg.Fields[tt.fieldName]; exists {

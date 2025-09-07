@@ -20,6 +20,12 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Fix go.mod version for release
+        run: |
+          # Ensure go.mod uses 1.23 instead of 1.23.0 for release compatibility
+          sed -i.bak 's/^go 1\.23\.0$/go 1.23/' go.mod
+          rm go.mod.bak
+
       - name: Build and Release
         uses: cli/gh-extension-precompile@v2
         with:
